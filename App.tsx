@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import {
+  createNavigationContainerRef,
+  DarkTheme,
+  NavigationContainer,
+  type Theme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './src/navigation/types';
 import { AddTransactionScreen } from './src/screens/AddTransactionScreen';
@@ -19,10 +24,12 @@ import { StoryScreen } from './src/screens/StoryScreen';
 import { TransactionDetailsScreen } from './src/screens/TransactionDetailsScreen';
 import { UnlockScreen } from './src/screens/UnlockScreen';
 import { clearAppState, isSetupComplete } from './src/storage/appState';
-import { clearSecureData, hasPin } from './src/storage/secure';
+import { shouldRelock } from './src/storage/autoLock';
+import { clearSecureData, hasPinWithRetry } from './src/storage/secure';
 import { colors } from './src/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 const theme: Theme = {
   ...DarkTheme,
@@ -30,16 +37,48 @@ const theme: Theme = {
 };
 
 async function resolveInitialRoute(): Promise<keyof RootStackParamList> {
-  if ((await isSetupComplete()) && (await hasPin())) {
-    return 'Unlock';
+  if (await isSetupComplete()) {
+    let pinSaved: boolean;
+    try {
+      pinSaved = await hasPinWithRetry();
+    } catch {
+      // The keychain can't be read right now; keep everything and ask for the PIN.
+      return 'Unlock';
+    }
+    if (pinSaved) {
+      return 'Unlock';
+    }
   }
   // A setup abandoned midway restarts from scratch rather than leaving a stray PIN.
   await Promise.all([clearSecureData(), clearAppState()]);
   return 'Intro';
 }
 
+/** Asks for the PIN again when the app comes back after a while in the background. */
+function useRelockOnReturn() {
+  useEffect(() => {
+    let backgroundedAt: number | null = null;
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background') {
+        backgroundedAt = Date.now();
+        return;
+      }
+      if (state !== 'active') {
+        return;
+      }
+      const route = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
+      if (shouldRelock(backgroundedAt, Date.now(), route)) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'Unlock' }] });
+      }
+      backgroundedAt = null;
+    });
+    return () => sub.remove();
+  }, []);
+}
+
 function App() {
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
+  useRelockOnReturn();
 
   useEffect(() => {
     resolveInitialRoute()
@@ -51,7 +90,7 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" />
       {initialRoute ? (
-        <NavigationContainer theme={theme}>
+        <NavigationContainer ref={navigationRef} theme={theme}>
           <Stack.Navigator
             initialRouteName={initialRoute}
             screenOptions={{

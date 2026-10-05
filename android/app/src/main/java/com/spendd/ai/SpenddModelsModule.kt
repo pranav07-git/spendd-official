@@ -22,7 +22,12 @@ class SpenddModelsModule(reactContext: ReactApplicationContext) : NativeSpenddMo
     private val downloads = reactContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     private val prefs = reactContext.getSharedPreferences("spendd.models", Context.MODE_PRIVATE)
 
-    private fun dir(): File = File(reactApplicationContext.getExternalFilesDir(null), DIR).apply { mkdirs() }
+    /** getExternalFilesDir() is null while shared storage is unavailable; never fall back to a relative path. */
+    private fun dir(): File {
+        val root = reactApplicationContext.getExternalFilesDir(null)
+            ?: throw IllegalStateException("Storage isn’t available right now")
+        return File(root, DIR).apply { mkdirs() }
+    }
     private fun modelFile(name: String) = File(dir(), name)
     private fun partFile(name: String) = File(dir(), "$name.part")
 
@@ -59,7 +64,7 @@ class SpenddModelsModule(reactContext: ReactApplicationContext) : NativeSpenddMo
         val model = modelFile(fileName)
         if (model.exists() && !prefs.contains(fileName)) {
             return result.put("state", "ready").put("downloadedBytes", model.length()).put("totalBytes", model.length())
-                .put("path", model.absolutePath)
+                .put("path", model.absolutePath).put("modifiedAt", model.lastModified())
         }
         val id = prefs.getLong(fileName, -1L)
         if (id == -1L) return result.put("state", "none")
@@ -80,6 +85,8 @@ class SpenddModelsModule(reactContext: ReactApplicationContext) : NativeSpenddMo
                     if (!part.renameTo(model)) throw IllegalStateException("Couldn’t move the model into place")
                     prefs.edit().remove(fileName).apply()
                     result.put("state", "ready").put("path", model.absolutePath)
+                        .put("downloadedBytes", model.length()).put("totalBytes", model.length())
+                        .put("modifiedAt", model.lastModified())
                 }
                 DownloadManager.STATUS_FAILED -> {
                     downloads.remove(id)
@@ -98,17 +105,25 @@ class SpenddModelsModule(reactContext: ReactApplicationContext) : NativeSpenddMo
     }
 
     override fun cancelDownload(fileName: String, promise: Promise) {
-        val id = prefs.getLong(fileName, -1L)
-        if (id != -1L) downloads.remove(id)
-        prefs.edit().remove(fileName).apply()
-        partFile(fileName).delete()
-        promise.resolve(null)
+        try {
+            val id = prefs.getLong(fileName, -1L)
+            if (id != -1L) downloads.remove(id)
+            prefs.edit().remove(fileName).apply()
+            partFile(fileName).delete()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("E_CANCEL", e)
+        }
     }
 
     override fun deleteModel(fileName: String, promise: Promise) {
-        modelFile(fileName).delete()
-        partFile(fileName).delete()
-        promise.resolve(null)
+        try {
+            modelFile(fileName).delete()
+            partFile(fileName).delete()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("E_DELETE", e)
+        }
     }
 
     override fun verify(fileName: String, sha256: String, promise: Promise) {

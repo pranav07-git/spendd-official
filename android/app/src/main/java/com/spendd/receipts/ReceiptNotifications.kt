@@ -51,6 +51,8 @@ object ReceiptNotifications {
             setAutoCancel(true)
         }
 
+    fun cancel(context: Context, id: Int) = NotificationManagerCompat.from(context).cancel(id)
+
     private fun post(context: Context, id: Int, build: NotificationCompat.Builder.() -> Unit) {
         if (!canPost(context)) return
         ensureChannel(context)

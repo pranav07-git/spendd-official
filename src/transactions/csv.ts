@@ -4,9 +4,17 @@ const HEADER = ['Date', 'Time', 'Type', 'Amount (INR)', 'Category', 'Paid to / f
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** Quotes a field when it holds a comma, quote or newline (RFC 4180). */
+/**
+ * Quotes a field when it holds a comma, quote or newline (RFC 4180). Text that a spreadsheet
+ * would run as a formula (starting with = + - @, tab or CR) gets a leading apostrophe. Numbers
+ * are written as they are, so negative amounts stay numeric.
+ */
 function cell(value: string | number | null | undefined): string {
-  const text = value == null ? '' : String(value);
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  const raw = value ?? '';
+  const text = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

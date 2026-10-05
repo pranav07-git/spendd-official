@@ -11,6 +11,8 @@ import com.spendd.ai.SpenddModelsModule
 import com.spendd.specs.NativeSpenddModelsSpec
 import com.spendd.specs.NativeSpenddTransactionsSpec
 import org.json.JSONObject
+import java.io.File
+import java.io.IOException
 import java.util.UUID
 
 /** JS access to the transaction log. Spec: src/native/NativeSpenddTransactions.ts */
@@ -41,7 +43,11 @@ class SpenddTransactionsModule(reactContext: ReactApplicationContext) :
     }
 
     override fun remove(id: String, promise: Promise) {
-        promise.resolve(store.remove(id))
+        try {
+            promise.resolve(store.remove(id))
+        } catch (e: Exception) {
+            promise.reject("E_REMOVE", e)
+        }
     }
 
     override fun update(id: String, patchJson: String, promise: Promise) {
@@ -53,14 +59,50 @@ class SpenddTransactionsModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    /** Pending jobs first, so none of them logs into the log after it is deleted. Every step runs. */
     override fun clear(promise: Promise) {
-        store.clear()
-        promise.resolve(null)
+        val errors = listOfNotNull(
+            runCatching { ReceiptIntake.clearPending(reactApplicationContext) }.exceptionOrNull(),
+            runCatching { if (!store.clear()) throw IOException("Couldn’t delete the transaction log") }.exceptionOrNull(),
+        )
+        if (errors.isEmpty()) promise.resolve(null) else promise.reject("E_CLEAR", errors.first())
+    }
+
+    /** Deletes a file:// path, but only inside the app's own storage. */
+    override fun deleteLocalFile(uri: String, promise: Promise) {
+        try {
+            val parsed = Uri.parse(uri)
+            val path = (if (parsed.scheme == null) uri else parsed.takeIf { it.scheme == "file" }?.path)
+                ?: throw IllegalArgumentException("Not a file URI")
+            val file = File(path).canonicalFile
+            val roots = listOfNotNull(
+                reactApplicationContext.filesDir,
+                reactApplicationContext.cacheDir,
+                reactApplicationContext.getExternalFilesDir(null),
+                reactApplicationContext.dataDir,
+            ).map { it.canonicalFile }
+            if (roots.none { file.path.startsWith(it.path + File.separator) }) {
+                throw IllegalArgumentException("Outside app storage")
+            }
+            promise.resolve(file.exists() && file.delete())
+        } catch (e: Exception) {
+            promise.reject("E_DELETE", e)
+        }
     }
 
     override fun importScreenshot(uri: String, promise: Promise) {
-        val queued = ReceiptIntake.submit(reactApplicationContext, listOf(Uri.parse(uri)), null)
-        if (queued > 0) promise.resolve(null) else promise.reject("E_IMPORT", "Couldn’t open that image")
+        val context = reactApplicationContext
+        val parsed = Uri.parse(uri)
+        val type = runCatching { context.contentResolver.getType(parsed) }.getOrNull()
+        if (!IntakeRules.acceptsUri(parsed.scheme, type)) {
+            promise.reject("E_IMPORT", "Couldn’t open that image")
+            return
+        }
+        // Copying a large image shouldn't hold up other native calls.
+        Thread {
+            val queued = runCatching { ReceiptIntake.submit(context, listOf(parsed), null) }.getOrDefault(0)
+            if (queued > 0) promise.resolve(null) else promise.reject("E_IMPORT", "Couldn’t open that image")
+        }.start()
     }
 }
 

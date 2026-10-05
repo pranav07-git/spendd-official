@@ -232,4 +232,62 @@ class ReceiptParserTest {
         assertEquals("9876543210@ybl", r.handle)
         assertEquals("rohit@okaxis", parseRows("₹10" to 80, "Paid to rohit @ okaxis" to 30).handle)
     }
+
+    @Test
+    fun debitScreenThatAlsoSaysCreditedIsADebit() {
+        val r = parseRows(
+            "Payment Successful" to 40,
+            "₹1,250" to 90,
+            "Debited from" to 30,
+            "HDFC Bank XX1234" to 30,
+            "Credited to" to 30,
+            "Rohit Joshi" to 36,
+            "12 Jul 2026, 3:15 PM" to 30,
+        )
+        assertEquals(Direction.DEBIT, r.direction)
+        assertEquals(1250.0, r.amount!!, 0.0)
+    }
+
+    @Test
+    fun creditedAloneStillMeansMoneyIn() {
+        val r = parseRows(
+            "₹500 credited" to 60,
+            "to your account from Anita Rao" to 30,
+            "12 Jul 2026" to 30,
+        )
+        assertEquals(Direction.CREDIT, r.direction)
+    }
+
+    @Test
+    fun anEmailAddressIsNotAUpiId() {
+        val r = parseRows(
+            "Paid to" to 30,
+            "Swiggy" to 40,
+            "₹349" to 90,
+            "Questions? support@gmail.com" to 24,
+            "swiggy.upi@icici" to 30,
+        )
+        assertEquals("swiggy.upi@icici", r.handle)
+
+        val emailOnly = parseRows("₹349" to 90, "Mail receipts to me@company.co.in" to 24)
+        assertNull(emailOnly.handle)
+    }
+
+    @Test
+    fun ignoresDatesAfterTomorrow() {
+        // today is 4 Oct 2026; an OCR slip turns 2026 into 2028.
+        val misread = parseRows("₹200" to 90, "Paid to Swiggy" to 30, "04/10/2028 13:05" to 30)
+        assertNull(misread.date)
+
+        // With a month name, the impossible year is dropped and the day and month still used.
+        val named = parseRows("₹200" to 90, "Paid to Swiggy" to 30, "04 Oct 2028, 1:05 PM" to 30)
+        assertEquals(ParsedDate(2026, 10, 4, 13, 5), named.date)
+
+        val tomorrow = parseRows("₹200" to 90, "Paid to Swiggy" to 30, "05 Oct 2026, 12:05 AM" to 30)
+        assertEquals(ParsedDate(2026, 10, 5, 0, 5), tomorrow.date)
+
+        // A later, plausible date on the screen is still used.
+        val both = parseRows("₹200" to 90, "Valid till 30/12/2027" to 24, "03/10/2026 10:00" to 30)
+        assertEquals(ParsedDate(2026, 10, 3, 10, 0), both.date)
+    }
 }

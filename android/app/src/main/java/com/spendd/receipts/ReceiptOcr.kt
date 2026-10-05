@@ -17,6 +17,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.abs
 
+/** The file isn't a readable image; retrying won't help. */
+class NotAnImageException(message: String) : IllegalArgumentException(message)
+
 /**
  * On-device OCR (ML Kit, bundled model) tuned for payment screens.
  *
@@ -36,26 +39,48 @@ object ReceiptOcr {
         Variant(0.5f) { Bitmap.createScaledBitmap(it, it.width / 2, it.height / 2, true) },
     )
 
+    /** Images are decoded at most this many pixels (a long scrolling screenshot fits). */
+    private const val MAX_PIXELS = 16_000_000L
+
     suspend fun recognize(file: File): Pair<List<OcrLine>, Int> {
-        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-            ?: throw IllegalArgumentException("Not an image")
-        return recognize(bitmap)
+        val bitmap = decodeBounded(file)
+        try {
+            return recognize(bitmap)
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     suspend fun recognize(bitmap: Bitmap): Pair<List<OcrLine>, Int> {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
             var lines = read(recognizer, bitmap, 1f)
-            FALLBACKS.forEachIndexed { i, variant ->
+            for ((i, variant) in FALLBACKS.withIndex()) {
                 // The inverted pass always runs: it is the cross-check for a misread "₹".
-                if (i > 0 && ReceiptParser.parse(lines, bitmap.height).amount != null) return@forEachIndexed
-                val extra = read(recognizer, variant.render(bitmap), variant.scale)
-                lines = merge(lines, extra)
+                if (i > 0 && ReceiptParser.parse(lines, bitmap.height).amount != null) continue
+                val rendered = variant.render(bitmap)
+                try {
+                    lines = merge(lines, read(recognizer, rendered, variant.scale))
+                } finally {
+                    // Each pass makes a full-size copy; free it before the next one.
+                    if (rendered !== bitmap) rendered.recycle()
+                }
             }
             return lines to bitmap.height
         } finally {
             recognizer.close()
         }
+    }
+
+    /** Decodes [file], downsampled by powers of two until it is at most [MAX_PIXELS]. */
+    private fun decodeBounded(file: File): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw NotAnImageException("Not an image")
+        var sample = 1
+        while (bounds.outWidth.toLong() * bounds.outHeight / (sample.toLong() * sample) > MAX_PIXELS) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        return BitmapFactory.decodeFile(file.absolutePath, options) ?: throw NotAnImageException("Not an image")
     }
 
     /** Adds amount-like lines from [extra] that the base pass did not already read. */

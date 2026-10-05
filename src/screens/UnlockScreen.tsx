@@ -1,24 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 import { PinEntry } from '../components/PinEntry';
 import { FingerprintIcon } from '../components/Icons';
 import type { ScreenProps } from '../navigation/types';
 import { getProfile } from '../storage/appState';
 import { wipeAllData } from '../storage/reset';
+import { attemptMessage } from '../storage/pinLockout';
 import {
+  checkPinAttempt,
   isBiometricsEnabled,
   unlockWithBiometrics,
-  verifyPin,
 } from '../storage/secure';
-
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 30_000;
 
 export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
   const [biometrics, setBiometrics] = useState(false);
   const [name, setName] = useState<string | null>(null);
-  const failedAttempts = useRef(0);
-  const lockedUntil = useRef(0);
 
   const goHome = useCallback(
     () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }),
@@ -47,23 +43,12 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
   }, [tryBiometrics]);
 
   const checkPin = async (pin: string) => {
-    const now = Date.now();
-    if (now < lockedUntil.current) {
-      return `Too many attempts. Try again in ${Math.ceil((lockedUntil.current - now) / 1000)}s.`;
-    }
-    if (await verifyPin(pin)) {
-      failedAttempts.current = 0;
+    const result = await checkPinAttempt(pin);
+    if (result.ok) {
       goHome();
       return null;
     }
-    failedAttempts.current += 1;
-    if (failedAttempts.current >= MAX_ATTEMPTS) {
-      failedAttempts.current = 0;
-      lockedUntil.current = now + LOCKOUT_MS;
-      return 'Too many attempts. Try again in 30s.';
-    }
-    const left = MAX_ATTEMPTS - failedAttempts.current;
-    return `Incorrect PIN. ${left} ${left === 1 ? 'attempt' : 'attempts'} left.`;
+    return attemptMessage(result);
   };
 
   const resetApp = () =>

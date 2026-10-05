@@ -132,3 +132,27 @@ npm run android      # terminal 2 – builds, installs and launches Spendd on th
 | `npm run android` | Build + install debug app on device/emulator |
 | `npm test` | Jest unit tests |
 | `npm run lint` | ESLint |
+| `cd android && ./gradlew :app:testDebugUnitTest` | Kotlin unit tests (parser, store, categories) |
+
+## Release builds
+
+Release APKs are never signed with the debug key. Create your own key once and **back it up** — without it you can't publish updates:
+
+```sh
+keytool -genkeypair -v -keystore spendd-release.jks -alias spendd -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Then either create `android/keystore.properties` (git-ignored; `storeFile` is relative to `android/`):
+
+```properties
+storeFile=../spendd-release.jks
+storePassword=…
+keyAlias=spendd
+keyPassword=…
+```
+
+or set `SPENDD_KEYSTORE_FILE`, `SPENDD_KEYSTORE_PASSWORD`, `SPENDD_KEY_ALIAS` and `SPENDD_KEY_PASSWORD`. Build with `cd android && ./gradlew :app:assembleRelease`. R8 shrinking is opt-in until tested: add `-Pspendd.enableR8=true`.
+
+CI (**Actions → Build Android APK**) runs the JS and Kotlin tests and uploads the APK as the `spendd-apk` artifact. For a signed release APK add the repository secrets `SPENDD_KEYSTORE_BASE64` (`base64 -i spendd-release.jks`), `SPENDD_KEYSTORE_PASSWORD`, `SPENDD_KEY_ALIAS` and `SPENDD_KEY_PASSWORD`; without them it builds a debug APK.
+
+The transaction log is encrypted with a Keystore key from this version on. Don't install an older build over it: older versions can't read the encrypted log.

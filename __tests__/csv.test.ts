@@ -37,3 +37,23 @@ it('quotes fields with commas, quotes or newlines', () => {
   const [, row] = transactionsToCsv([tx({ counterparty: 'Rao, Sons', note: 'said "thanks"\nlater' })]).split(/\n(?=2026)/);
   expect(row).toBe('2026-10-05,09:07,Money out,250,Medical,"Rao, Sons",Cash,"said ""thanks""\nlater",,');
 });
+
+it('neutralises text a spreadsheet would run as a formula', () => {
+  const rows = ['=HYPERLINK("http://x")', '+1+1', '-2+3', '@SUM(A1)', '\tcmd', '\rcmd', 'Normal'].map(note =>
+    transactionsToCsv([tx({ note, counterparty: 'A' })]).split(/\n(?=2026)/)[1].split(',').slice(7).join(','),
+  );
+  expect(rows).toEqual([
+    `"'=HYPERLINK(""http://x"")",,`,
+    "'+1+1,,",
+    "'-2+3,,",
+    "'@SUM(A1),,",
+    "'\tcmd,,",
+    `"'\rcmd",,`,
+    'Normal,,',
+  ]);
+});
+
+it('leaves numeric amounts numeric', () => {
+  const [, row] = transactionsToCsv([tx({ amount: -250 })]).split('\n');
+  expect(row.split(',')[3]).toBe('-250');
+});

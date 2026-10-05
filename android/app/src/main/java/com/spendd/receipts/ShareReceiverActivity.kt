@@ -18,20 +18,30 @@ class ShareReceiverActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val uris = sharedImages(intent)
-        // getReferrer() is "android-app://<package>" for the app that started the share.
+        // getReferrer() is "android-app://<package>" for the app that started the share. The sender
+        // can set it, so it is only used as a display label.
         val sourceApp = SourceApps.labelFor(this, referrer?.host)
-        val queued = if (uris.isEmpty()) 0 else ReceiptIntake.submit(this, uris, sourceApp)
+        val app = applicationContext
 
-        when {
-            queued == 0 -> Toast.makeText(this, "Spendd couldn’t open that image", Toast.LENGTH_SHORT).show()
-            // With notifications off, still acknowledge the share.
-            !ReceiptNotifications.canPost(this) ->
-                Toast.makeText(this, "Logging transaction in Spendd…", Toast.LENGTH_SHORT).show()
-        }
-        finish()
+        // Copying can take a moment for large images; keep it off the main thread. The activity
+        // stays open until then, because read access to the shared URIs ends when it finishes.
+        Thread {
+            val queued = if (uris.isEmpty()) 0 else ReceiptIntake.submit(app, uris, sourceApp)
+            runOnUiThread {
+                when {
+                    queued == 0 -> Toast.makeText(app, "Spendd couldn’t open that image", Toast.LENGTH_SHORT).show()
+                    // With notifications off, still acknowledge the share.
+                    !ReceiptNotifications.canPost(app) ->
+                        Toast.makeText(app, "Logging transaction in Spendd…", Toast.LENGTH_SHORT).show()
+                }
+                finish()
+            }
+        }.start()
     }
 
+    /** content:// images only, at most [IntakeRules.MAX_IMAGES]; anything else is refused. */
     private fun sharedImages(intent: Intent): List<Uri> {
+        if (intent.type?.lowercase()?.startsWith("image/") != true) return emptyList()
         val fromExtras = when (intent.action) {
             Intent.ACTION_SEND ->
                 listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
@@ -39,8 +49,12 @@ class ShareReceiverActivity : Activity() {
                 IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
             else -> emptyList()
         }
-        if (fromExtras.isNotEmpty()) return fromExtras
-        val clip = intent.clipData ?: return emptyList()
-        return (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
+        val candidates = fromExtras.ifEmpty {
+            val clip = intent.clipData ?: return emptyList()
+            (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
+        }
+        return candidates
+            .filter { uri -> IntakeRules.acceptsUri(uri.scheme, runCatching { contentResolver.getType(uri) }.getOrNull()) }
+            .take(IntakeRules.MAX_IMAGES)
     }
 }

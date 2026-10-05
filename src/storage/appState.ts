@@ -13,6 +13,19 @@ const KEYS = {
   aiInsights: 'spendd.aiInsights',
 };
 
+/** JSON.parse that falls back to [fallback] for missing, corrupt or non-object data. */
+export function parseJson<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) {
+    return fallback;
+  }
+  try {
+    const value: unknown = JSON.parse(raw);
+    return value !== null && typeof value === 'object' ? (value as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export type ImportedStatement = {
   name: string;
   size: number | null;
@@ -41,13 +54,11 @@ export async function saveStatement(statement: ImportedStatement): Promise<void>
 }
 
 export async function getStatement(): Promise<ImportedStatement | null> {
-  const raw = await AsyncStorage.getItem(KEYS.statement);
-  return raw ? (JSON.parse(raw) as ImportedStatement) : null;
+  return parseJson<ImportedStatement | null>(await AsyncStorage.getItem(KEYS.statement), null);
 }
 
 export async function getBudget(): Promise<Budget | null> {
-  const raw = await AsyncStorage.getItem(KEYS.budget);
-  return raw ? (JSON.parse(raw) as Budget) : null;
+  return parseJson<Budget | null>(await AsyncStorage.getItem(KEYS.budget), null);
 }
 
 export async function saveBudget(budget: Budget): Promise<void> {
@@ -67,8 +78,7 @@ export type Profile = {
 export const DEFAULT_PROFILE: Profile = { name: USER_NAME, avatar: null };
 
 export async function getProfile(): Promise<Profile> {
-  const raw = await AsyncStorage.getItem(KEYS.profile);
-  return raw ? { ...DEFAULT_PROFILE, ...(JSON.parse(raw) as Partial<Profile>) } : DEFAULT_PROFILE;
+  return { ...DEFAULT_PROFILE, ...parseJson<Partial<Profile>>(await AsyncStorage.getItem(KEYS.profile), {}) };
 }
 
 export async function saveProfile(profile: Profile): Promise<void> {
@@ -80,11 +90,21 @@ export type AiSettings = {
   enabled: boolean;
   /** The downloaded model's checksum has been verified. */
   verified: boolean;
+  /** Size and modified time of the file that was verified; a change means it must be verified again. */
+  fingerprint?: ModelFingerprint | null;
 };
 
+export type ModelFingerprint = { size: number; modifiedAt: number };
+
+export const DEFAULT_AI_SETTINGS: AiSettings = { enabled: false, verified: false, fingerprint: null };
+
 export async function getAiSettings(): Promise<AiSettings> {
-  const raw = await AsyncStorage.getItem(KEYS.ai);
-  return raw ? (JSON.parse(raw) as AiSettings) : { enabled: false, verified: false };
+  const saved = parseJson<Partial<AiSettings>>(await AsyncStorage.getItem(KEYS.ai), {});
+  return {
+    enabled: saved.enabled === true,
+    verified: saved.verified === true,
+    fingerprint: saved.fingerprint ?? null,
+  };
 }
 
 export async function saveAiSettings(settings: AiSettings): Promise<void> {
@@ -95,8 +115,8 @@ export async function saveAiSettings(settings: AiSettings): Promise<void> {
 export type AiInsightsCache = { hash: string; insights: Insight[]; generatedAt: number };
 
 export async function getAiInsightsCache(): Promise<AiInsightsCache | null> {
-  const raw = await AsyncStorage.getItem(KEYS.aiInsights);
-  return raw ? (JSON.parse(raw) as AiInsightsCache) : null;
+  const cache = parseJson<AiInsightsCache | null>(await AsyncStorage.getItem(KEYS.aiInsights), null);
+  return cache && Array.isArray(cache.insights) ? cache : null;
 }
 
 export async function saveAiInsightsCache(cache: AiInsightsCache): Promise<void> {

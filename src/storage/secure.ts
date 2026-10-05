@@ -1,7 +1,15 @@
 import * as Keychain from 'react-native-keychain';
+import {
+  attemptPin,
+  constantTimeEqual,
+  parseLockout,
+  type LockoutStore,
+  type PinAttempt,
+} from './pinLockout';
 
 const PIN_SERVICE = 'com.spendd.pin';
 const BIOMETRIC_SERVICE = 'com.spendd.biometric';
+const LOCKOUT_SERVICE = 'com.spendd.pinLockout';
 const ACCOUNT = 'spendd';
 
 const biometricPrompt: Keychain.AuthenticationPrompt = {
@@ -21,13 +29,58 @@ export async function savePin(pin: string): Promise<void> {
   }
 }
 
-export async function verifyPin(pin: string): Promise<boolean> {
+async function verifyPin(pin: string): Promise<boolean> {
   const credentials = await Keychain.getGenericPassword({ service: PIN_SERVICE });
-  return credentials !== false && credentials.password === pin;
+  return credentials !== false && constantTimeEqual(credentials.password, pin);
 }
+
+/** Kept in the keychain so force-closing the app doesn't reset the count. */
+const lockoutStore: LockoutStore = {
+  load: async () => {
+    const saved = await Keychain.getGenericPassword({ service: LOCKOUT_SERVICE });
+    return parseLockout(saved === false ? null : saved.password);
+  },
+  save: async state => {
+    const result = await Keychain.setGenericPassword(ACCOUNT, JSON.stringify(state), {
+      service: LOCKOUT_SERVICE,
+      storage: Keychain.STORAGE_TYPE.AES_GCM_NO_AUTH,
+    });
+    if (!result) {
+      throw new Error('Could not save PIN attempts');
+    }
+  },
+};
+
+/** Checks the PIN under the persistent lockout shared by every PIN prompt. */
+export const checkPinAttempt = (pin: string): Promise<PinAttempt> => attemptPin(pin, verifyPin, lockoutStore);
 
 export async function hasPin(): Promise<boolean> {
   return Keychain.hasGenericPassword({ service: PIN_SERVICE });
+}
+
+/**
+ * hasPin(), asked up to [tries] times: one keychain hiccup at startup must not read as
+ * "no PIN" and wipe the app. Rejects if every try threw.
+ */
+export async function hasPinWithRetry(tries = 3, delayMs = 150): Promise<boolean> {
+  let lastError: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      if (await hasPin()) {
+        return true;
+      }
+      lastError = undefined;
+    } catch (e) {
+      lastError = e;
+    }
+    if (i < tries - 1) {
+      await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  if (lastError !== undefined) {
+    throw lastError;
+  }
+  return false;
 }
 
 /** Returns null when the device has no enrolled strong biometric. */
@@ -77,5 +130,6 @@ export async function clearSecureData(): Promise<void> {
   await Promise.all([
     Keychain.resetGenericPassword({ service: PIN_SERVICE }),
     Keychain.resetGenericPassword({ service: BIOMETRIC_SERVICE }),
+    Keychain.resetGenericPassword({ service: LOCKOUT_SERVICE }),
   ]);
 }

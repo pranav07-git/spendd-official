@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import NativeSpenddModels from '../native/NativeSpenddModels';
-import { getAiSettings, saveAiSettings, type AiSettings } from '../storage/appState';
+import { DEFAULT_AI_SETTINGS, getAiSettings, saveAiSettings, type AiSettings } from '../storage/appState';
 import { AI_MODEL } from './aiPrompt';
+import { fingerprintOf, isStillVerified } from './modelFingerprint';
 
 export type AiModelPhase = 'checking' | 'none' | 'downloading' | 'paused' | 'verifying' | 'ready' | 'failed';
 
@@ -27,10 +28,12 @@ type NativeStatus = {
   downloadedBytes: number;
   totalBytes: number;
   path: string | null;
+  /** Epoch ms the ready file was last modified. */
+  modifiedAt?: number;
   reason?: string;
 };
 
-// Shared across hook instances so the 491 MB checksum only runs once.
+// Shared across hook instances so the 491 MB checksum runs once per file, not once per caller.
 let verifying: Promise<boolean> | null = null;
 const verifyOnce = () => {
   verifying ??= NativeSpenddModels.verify(AI_MODEL.fileName, AI_MODEL.sha256).finally(() => {
@@ -48,7 +51,7 @@ export function useAiModel(): AiModel {
     path: null,
     reason: null,
   });
-  const [settings, setSettings] = useState<AiSettings>({ enabled: false, verified: false });
+  const [settings, setSettings] = useState<AiSettings>(DEFAULT_AI_SETTINGS);
   const [memoryBytes, setMemoryBytes] = useState<number | null>(null);
   const settingsRef = useRef(settings);
 
@@ -63,20 +66,24 @@ export function useAiModel(): AiModel {
       const s = JSON.parse(await NativeSpenddModels.status(AI_MODEL.fileName)) as NativeStatus;
       const base = { downloadedBytes: s.downloadedBytes, totalBytes: s.totalBytes || AI_MODEL.bytes, reason: s.reason ?? null };
       if (s.state === 'ready') {
-        if (!settingsRef.current.verified) {
+        const fingerprint = fingerprintOf(s);
+        if (!isStillVerified(settingsRef.current, fingerprint)) {
+          const wasVerified = settingsRef.current.verified;
           setStatus({ ...base, phase: 'verifying', path: null });
           if (!(await verifyOnce())) {
             await NativeSpenddModels.deleteModel(AI_MODEL.fileName);
+            await updateSettings({ ...settingsRef.current, verified: false, fingerprint: null });
             setStatus({ ...base, phase: 'failed', path: null, reason: 'The download was damaged. Try again.' });
             return;
           }
-          await updateSettings({ enabled: true, verified: true });
+          // A re-check of an already verified model keeps the user's on/off choice.
+          await updateSettings({ enabled: wasVerified ? settingsRef.current.enabled : true, verified: true, fingerprint });
         }
         setStatus({ ...base, phase: 'ready', path: s.path });
         return;
       }
       if (s.state === 'none' && settingsRef.current.verified) {
-        await updateSettings({ enabled: false, verified: false }); // model was deleted
+        await updateSettings(DEFAULT_AI_SETTINGS); // model was deleted
       }
       setStatus({ ...base, phase: s.state, path: null });
     } catch {
@@ -86,7 +93,7 @@ export function useAiModel(): AiModel {
 
   useEffect(() => {
     getAiSettings()
-      .catch(() => ({ enabled: false, verified: false }))
+      .catch(() => DEFAULT_AI_SETTINGS)
       .then(saved => {
         settingsRef.current = saved;
         setSettings(saved);
@@ -107,7 +114,7 @@ export function useAiModel(): AiModel {
   }, [busy, refresh]);
 
   const download = useCallback(async () => {
-    await updateSettings({ enabled: true, verified: false });
+    await updateSettings({ enabled: true, verified: false, fingerprint: null });
     await NativeSpenddModels.startDownload(AI_MODEL.url, AI_MODEL.fileName, `Spendd AI (${AI_MODEL.name})`);
     await refresh();
   }, [refresh, updateSettings]);
@@ -119,7 +126,7 @@ export function useAiModel(): AiModel {
 
   const remove = useCallback(async () => {
     await NativeSpenddModels.deleteModel(AI_MODEL.fileName);
-    await updateSettings({ enabled: false, verified: false });
+    await updateSettings(DEFAULT_AI_SETTINGS);
     await refresh();
   }, [refresh, updateSettings]);
 

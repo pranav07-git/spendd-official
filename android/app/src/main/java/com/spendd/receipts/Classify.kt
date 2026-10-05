@@ -23,13 +23,17 @@ object SourceApps {
 }
 
 object Categories {
+    /** Each keyword must start a word: "ola" matches "Ola Cabs", not "Kolar"; "gas" not "Vegas". */
+    private fun words(vararg keywords: String) =
+        Regex("(?<![\\p{L}\\p{N}])(?:${keywords.joinToString("|")})", RegexOption.IGNORE_CASE)
+
     private val RULES = listOf(
-        "Food" to Regex("swiggy|zomato|domino|mcdonald|kfc|pizza|burger|cafe|café|restaurant|eats|starbucks|chai", RegexOption.IGNORE_CASE),
-        "Groceries" to Regex("blinkit|zepto|instamart|bigbasket|dmart|grocer|jiomart|kirana|mart\\b", RegexOption.IGNORE_CASE),
-        "Travel" to Regex("uber|ola\\b|rapido|irctc|metro|redbus|makemytrip|indigo|fuel|petrol|indianoil|hpcl|bpcl|fastag", RegexOption.IGNORE_CASE),
-        "Shopping" to Regex("amazon|flipkart|myntra|ajio|nykaa|meesho|croma|reliance digital|decathlon", RegexOption.IGNORE_CASE),
-        "Entertainment" to Regex("netflix|spotify|hotstar|prime video|youtube|bookmyshow|pvr|inox|steam", RegexOption.IGNORE_CASE),
-        "Bills" to Regex("airtel|jio|vodafone|\\bvi\\b|electricity|bescom|tata power|recharge|broadband|gas|water bill", RegexOption.IGNORE_CASE),
+        "Food" to words("swiggy", "zomato", "domino", "mcdonald", "kfc", "pizza", "burger", "cafe", "café", "restaurant", "eats", "starbucks", "chai"),
+        "Groceries" to words("blinkit", "zepto", "instamart", "bigbasket", "dmart", "grocer", "jiomart", "kirana", "mart\\b"),
+        "Travel" to words("uber", "ola\\b", "rapido", "irctc", "metro", "redbus", "makemytrip", "indigo", "fuel", "petrol", "indianoil", "hpcl", "bpcl", "fastag"),
+        "Shopping" to words("amazon", "flipkart", "myntra", "ajio", "nykaa", "meesho", "croma", "reliance digital", "decathlon"),
+        "Entertainment" to words("netflix", "spotify", "hotstar", "prime video", "youtube", "bookmyshow", "pvr", "inox", "steam"),
+        "Bills" to words("airtel", "jio", "vodafone", "vi\\b", "electricity", "bescom", "tata power", "recharge", "broadband", "gas", "water bill"),
     )
 
     /** Returns (category, kind) where kind is "merchant" or "personal". */

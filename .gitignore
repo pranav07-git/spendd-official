@@ -76,3 +76,7 @@ yarn-error.log
 
 # Real payment screenshots used as OCR fixtures contain personal UPI details
 android/app/src/androidTest/assets/receipts/
+
+# Release signing (never commit the key or its passwords)
+android/keystore.properties
+*.jks

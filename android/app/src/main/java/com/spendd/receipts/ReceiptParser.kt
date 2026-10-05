@@ -56,7 +56,13 @@ object ReceiptParser {
     private val PROMO = Regex("\\b(starting|cashback|upto|up to|off|offer|offers|balance|reward|rewards|emi|save|win|won|worth|coupon|scratch)\\b|\\*", IC)
 
     private val CREDIT_HINT = Regex(
-        "\\b(received from|you received|money received|payment received|received successfully|credited|refund(ed)?)\\b",
+        "\\b(received from|you received|money received|payment received|received successfully|refund(ed)?)\\b",
+        IC,
+    )
+    /** "Credited" alone is weak: debit screens say "Debited from A/c ... credited to <payee>". */
+    private val CREDITED = Regex("\\bcredited\\b", IC)
+    private val DEBIT_HINT = Regex(
+        "\\b(debited|paid to|sent to|transferred to|paid successfully|payment to|money sent)\\b",
         IC,
     )
     private val PAYMENT_HINT = Regex(
@@ -86,7 +92,8 @@ object ReceiptParser {
         IC,
     )
 
-    private val HANDLE = Regex("[a-z0-9._\\-]{2,}@[a-z]{2,}", IC)
+    /** A UPI ID ("name@okaxis"); an email address ("name@gmail.com") is not one. */
+    private val HANDLE = Regex("[a-z0-9._\\-]{2,}@[a-z]{2,}\\b(?!\\.[a-z])", IC)
     private val MASKED_ACCOUNT = Regex("(?:[x*•]{2,}\\s?)\\d{3,4}\\b", IC)
     private val TXN_REF = Regex(
         "\\b(?:txn|transaction|utr|rrn|ref(?:erence)?|order)\\s*(?:id|no\\.?|number|#)?\\s*[:#.]?\\s*(?=[a-z\\-]*\\d)([a-z0-9][a-z0-9\\-]{5,})",
@@ -119,7 +126,7 @@ object ReceiptParser {
     fun parse(rawLines: List<OcrLine>, imageHeight: Int, today: ParsedDate = today()): ParsedReceipt {
         val lines = normalise(rawLines)
         val allText = lines.joinToString("\n") { it.text }
-        val direction = if (lines.any { CREDIT_HINT.containsMatchIn(it.text) }) Direction.CREDIT else Direction.DEBIT
+        val direction = findDirection(lines)
         val amount = findAmount(lines)
         val counterparty = findCounterparty(lines, direction, amount, imageHeight)
         val date = findDate(lines, imageHeight, today)
@@ -138,6 +145,15 @@ object ReceiptParser {
             looksLikePayment = amount != null || txnRef != null || handle != null ||
                 (date != null && lines.count { PAYMENT_HINT.containsMatchIn(it.text) } > 0),
         )
+    }
+
+    private fun findDirection(lines: List<OcrLine>): Direction {
+        fun any(regex: Regex) = lines.any { regex.containsMatchIn(it.text) }
+        return when {
+            any(CREDIT_HINT) -> Direction.CREDIT
+            any(CREDITED) && !any(DEBIT_HINT) -> Direction.CREDIT
+            else -> Direction.DEBIT
+        }
     }
 
     /** True for text that could be a payment amount; used to merge extra OCR passes. */
@@ -330,7 +346,8 @@ object ReceiptParser {
         )
         for (match in matchers) {
             lines.forEachIndexed { i, line ->
-                val date = match(line.text) ?: return@forEachIndexed
+                // A misread digit can produce a date that hasn't happened yet; ignore it.
+                val date = match(line.text)?.takeUnless { isAfterTomorrow(it, today) } ?: return@forEachIndexed
                 val time = matchTime12(line.text)
                     ?: lines.getOrNull(i + 1)?.let { matchTime12(it.text) }
                     ?: lines.getOrNull(i - 1)?.let { matchTime12(it.text) }
@@ -344,6 +361,18 @@ object ReceiptParser {
             }
         }
         return null
+    }
+
+    /** Tomorrow is allowed: the phone and the bank may disagree about the date near midnight. */
+    private fun isAfterTomorrow(date: ParsedDate, today: ParsedDate): Boolean {
+        val tomorrow = Calendar.getInstance().apply {
+            clear()
+            set(today.year, today.month - 1, today.day)
+            add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val key = { y: Int, m: Int, d: Int -> y * 10_000 + m * 100 + d }
+        return key(date.year, date.month, date.day) >
+            key(tomorrow.get(Calendar.YEAR), tomorrow.get(Calendar.MONTH) + 1, tomorrow.get(Calendar.DAY_OF_MONTH))
     }
 
     private fun monthIndex(name: String): Int = MONTHS.indexOf(name.lowercase().take(3)) + 1

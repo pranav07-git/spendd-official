@@ -10,7 +10,10 @@ export interface Spec extends TurboModule {
   remove(id: string): Promise<boolean>;
   /** Merges a JSON object of fields into a transaction; resolves the updated JSON (or null). */
   update(id: string, patchJson: string): Promise<string | null>;
+  /** Deletes the log, its quarantined copies, queued screenshots and pending logging jobs. */
   clear(): Promise<void>;
+  /** Deletes a file:// path inside the app's private storage; resolves false if nothing was deleted. */
+  deleteLocalFile(uri: string): Promise<boolean>;
   /** Queues a picked image (content:// URI) for the same background logging as a share. */
   importScreenshot(uri: string): Promise<void>;
 }

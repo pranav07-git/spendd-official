@@ -55,9 +55,40 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ * R8 shrinking/obfuscation for release builds. Opt in with -Pspendd.enableR8=true until a
+ * minified build has been tested with llama.rn, ML Kit and WorkManager (keep rules: proguard-rules.pro).
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = (findProperty("spendd.enableR8") ?: "false").toString().toBoolean()
+
+/**
+ * Release signing: android/keystore.properties (storeFile, storePassword, keyAlias, keyPassword;
+ * never committed) or the SPENDD_KEYSTORE_FILE / SPENDD_KEYSTORE_PASSWORD / SPENDD_KEY_ALIAS /
+ * SPENDD_KEY_PASSWORD environment variables. Without either, release builds are unsigned.
+ */
+def releaseSigning = [:]
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.exists()) {
+    def props = new Properties()
+    keystorePropertiesFile.withInputStream { props.load(it) }
+    releaseSigning = [
+        storeFile    : props.getProperty("storeFile"),
+        storePassword: props.getProperty("storePassword"),
+        keyAlias     : props.getProperty("keyAlias"),
+        keyPassword  : props.getProperty("keyPassword"),
+    ]
+} else if (System.getenv("SPENDD_KEYSTORE_FILE")) {
+    releaseSigning = [
+        storeFile    : System.getenv("SPENDD_KEYSTORE_FILE"),
+        storePassword: System.getenv("SPENDD_KEYSTORE_PASSWORD"),
+        keyAlias     : System.getenv("SPENDD_KEY_ALIAS"),
+        keyPassword  : System.getenv("SPENDD_KEY_PASSWORD"),
+    ]
+}
+def hasReleaseSigning = !releaseSigning.isEmpty() && releaseSigning.values().every { it }
+if (!hasReleaseSigning) {
+    logger.warn("Spendd: no release signing key configured (android/keystore.properties or SPENDD_* " +
+        "environment variables), so release builds are unsigned and can't be installed.")
+}
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -93,16 +124,24 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile rootProject.file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Never the public debug key: anyone could sign an "update" with it.
+            signingConfig hasReleaseSigning ? signingConfigs.release : null
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
@@ -138,6 +177,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     testImplementation("junit:junit:4.13.2")
+    // Real org.json for JVM unit tests (android.jar only has stubs).
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
 

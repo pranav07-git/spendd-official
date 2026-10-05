@@ -3,7 +3,12 @@ import type { Transaction } from './types';
 
 export async function listTransactions(): Promise<Transaction[]> {
   const raw = await NativeSpenddTransactions.list();
-  return JSON.parse(raw) as Transaction[];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Transaction[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 export type NewTransaction = Omit<Transaction, 'id' | 'createdAt'>;
@@ -21,7 +26,11 @@ export async function updateTransaction(id: string, patch: Partial<Transaction>)
 
 export const removeTransaction = (id: string) => NativeSpenddTransactions.remove(id);
 
+/** Deletes the log, its quarantined copies, queued screenshots and pending logging jobs. */
 export const clearTransactions = () => NativeSpenddTransactions.clear();
+
+/** Deletes a file:// copy inside the app's own storage (e.g. the imported statement). */
+export const deleteLocalFile = (uri: string) => NativeSpenddTransactions.deleteLocalFile(uri);
 
 /** Same background pipeline as sharing from another app. */
 export const importScreenshot = (uri: string) => NativeSpenddTransactions.importScreenshot(uri);
