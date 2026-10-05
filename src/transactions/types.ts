@@ -16,6 +16,9 @@ export type Transaction = {
   hasTime: boolean;
   dateFromReceipt: boolean;
   needsReview?: boolean;
+  /** Entered by hand on the Add Transaction screen rather than read from a screenshot. */
+  manual?: boolean;
+  note?: string | null;
   createdAt: number;
   rawText: string;
 };

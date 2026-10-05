@@ -23,6 +23,21 @@ export function formatTime(timestamp: number): string {
   return `${hours % 12 || 12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`;
 }
 
+export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "Sunday, 5 October" */
+export function formatLongDate(timestamp: number): string {
+  const d = new Date(timestamp);
+  return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${LONG_MONTHS[d.getMonth()]}`;
+}
+
+/** "5 Oct" */
+export function formatDayMonth(timestamp: number): string {
+  const d = new Date(timestamp);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
 export function formatDate(timestamp: number): string {
   const d = new Date(timestamp);
   return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${d.getFullYear()}`;
@@ -30,13 +45,17 @@ export function formatDate(timestamp: number): string {
 
 export function titleFor(tx: Transaction): string {
   if (!tx.counterparty) {
+    if (tx.manual) {
+      return tx.category;
+    }
     return tx.direction === 'credit' ? 'Money received' : 'Payment';
   }
   return tx.direction === 'credit' ? `Received from ${tx.counterparty}` : `Paid to ${tx.counterparty}`;
 }
 
 export function initialFor(tx: Transaction): string {
-  return (tx.counterparty?.trim().charAt(0) || '₹').toUpperCase();
+  const name = tx.counterparty ?? (tx.manual ? tx.category : null);
+  return (name?.trim().charAt(0) || '₹').toUpperCase();
 }
 
 /** "GOOGLE PAY • 11:30 PM" — where it was paid from, and when. */
@@ -59,11 +78,21 @@ export function matchesQuery(tx: Transaction, query: string): boolean {
   );
 }
 
-function startOfDay(timestamp: number): number {
+export function startOfDay(timestamp: number): number {
   const d = new Date(timestamp);
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
+
+/** Calendar-aware, so it stays at midnight across DST changes. */
+export function addDays(timestamp: number, days: number): number {
+  const d = new Date(timestamp);
+  d.setDate(d.getDate() + days);
+  return d.getTime();
+}
+
+/** Whole calendar days from one start-of-day to another. */
+export const daysBetween = (from: number, to: number) => Math.round((to - from) / (24 * 60 * 60 * 1000));
 
 export type DaySection = { title: string; data: Transaction[] };
 

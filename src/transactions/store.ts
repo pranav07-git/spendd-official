@@ -6,6 +6,14 @@ export async function listTransactions(): Promise<Transaction[]> {
   return JSON.parse(raw) as Transaction[];
 }
 
+export type NewTransaction = Omit<Transaction, 'id' | 'createdAt'>;
+
+/** Logs a manually entered transaction; the id and createdAt are assigned natively. */
+export async function addTransaction(tx: NewTransaction): Promise<Transaction> {
+  const raw = await NativeSpenddTransactions.add(JSON.stringify(tx));
+  return JSON.parse(raw) as Transaction;
+}
+
 export async function updateTransaction(id: string, patch: Partial<Transaction>): Promise<Transaction | null> {
   const raw = await NativeSpenddTransactions.update(id, JSON.stringify(patch));
   return raw ? (JSON.parse(raw) as Transaction) : null;

@@ -7,8 +7,11 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
+import com.spendd.ai.SpenddModelsModule
+import com.spendd.specs.NativeSpenddModelsSpec
 import com.spendd.specs.NativeSpenddTransactionsSpec
 import org.json.JSONObject
+import java.util.UUID
 
 /** JS access to the transaction log. Spec: src/native/NativeSpenddTransactions.ts */
 class SpenddTransactionsModule(reactContext: ReactApplicationContext) :
@@ -21,6 +24,19 @@ class SpenddTransactionsModule(reactContext: ReactApplicationContext) :
             promise.resolve(store.readAll().toString())
         } catch (e: Exception) {
             promise.reject("E_READ", e)
+        }
+    }
+
+    override fun add(transactionJson: String, promise: Promise) {
+        try {
+            val tx = JSONObject(transactionJson).apply {
+                put("id", UUID.randomUUID().toString())
+                put("createdAt", System.currentTimeMillis())
+            }
+            store.add(tx)
+            promise.resolve(tx.toString())
+        } catch (e: Exception) {
+            promise.reject("E_ADD", e)
         }
     }
 
@@ -50,18 +66,22 @@ class SpenddTransactionsModule(reactContext: ReactApplicationContext) :
 
 class SpenddPackage : BaseReactPackage() {
     override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? =
-        if (name == NativeSpenddTransactionsSpec.NAME) SpenddTransactionsModule(reactContext) else null
+        when (name) {
+            NativeSpenddTransactionsSpec.NAME -> SpenddTransactionsModule(reactContext)
+            NativeSpenddModelsSpec.NAME -> SpenddModelsModule(reactContext)
+            else -> null
+        }
 
     override fun getReactModuleInfoProvider() = ReactModuleInfoProvider {
-        mapOf(
-            NativeSpenddTransactionsSpec.NAME to ReactModuleInfo(
-                name = NativeSpenddTransactionsSpec.NAME,
-                className = NativeSpenddTransactionsSpec.NAME,
+        listOf(NativeSpenddTransactionsSpec.NAME, NativeSpenddModelsSpec.NAME).associateWith { name ->
+            ReactModuleInfo(
+                name = name,
+                className = name,
                 canOverrideExistingModule = false,
                 needsEagerInit = false,
                 isCxxModule = false,
                 isTurboModule = true,
-            ),
-        )
+            )
+        }
     }
 }

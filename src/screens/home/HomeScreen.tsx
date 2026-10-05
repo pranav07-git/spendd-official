@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
   BackHandler,
   PermissionsAndroid,
   Platform,
@@ -11,21 +12,31 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { OutlineButton } from '../../components/Buttons';
+import { Avatar } from '../../components/Avatar';
 import { BellIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
-import { USER_NAME } from '../../config';
-import {
-  dailyBudget,
-  dailyStatus,
-  habits,
-  insights,
-  todaysStory,
-} from '../../data/homeSample';
+import { buildInsights } from '../../insights/engine';
+import type { InsightsReport, StoryItem } from '../../insights/types';
+import { useAiInsights, type AiInsights } from '../../insights/useAiInsights';
+import { useAiModel } from '../../insights/useAiModel';
 import type { ScreenProps } from '../../navigation/types';
-import { getStatement, type ImportedStatement } from '../../storage/appState';
-import { colors, fonts } from '../../theme';
 import {
+  DEFAULT_PROFILE,
+  getBudget,
+  getProfile,
+  type Profile,
+} from '../../storage/appState';
+import type { Budget } from '../../transactions/budget';
+import { emojiFor } from '../../transactions/categories';
+import { formatRupees } from '../../transactions/format';
+import { todaysStory } from '../../transactions/stories';
+import { listTransactions } from '../../transactions/store';
+import { paymentCount } from '../../transactions/summary';
+import type { Transaction } from '../../transactions/types';
+import { colors, fonts } from '../../theme';
+import { AccountsTab } from './AccountsTab';
+import {
+  AiNote,
   DailyBudgetCard,
   DailyStatusCard,
   FadeIn,
@@ -34,8 +45,13 @@ import {
   SectionTitle,
   StoryStrip,
 } from './HomeSections';
-import { TABS, TabBar, type TabKey } from './TabBar';
+import { InsightsTab } from './InsightsTab';
+import { ProfileTab } from './ProfileTab';
+import { TabBar, type TabKey } from './TabBar';
 import { TransactionsTab } from './TransactionsTab';
+
+/** How many insights the home feed previews; the Insights tab shows them all. */
+const HOME_INSIGHTS = 3;
 
 function greetingFor(date: Date) {
   const hour = date.getHours();
@@ -91,7 +107,52 @@ function useToast() {
   return { show, node };
 }
 
-function HomeFeed({ onSeeAllInsights }: { onSeeAllInsights: () => void }) {
+/** One card per story slide, in the same order the story viewer shows them. */
+function storiesFor(transactions: Transaction[]): StoryItem[] {
+  return todaysStory(transactions).map(slide => {
+    if (slide.kind === 'empty') {
+      return {
+        id: 'empty',
+        emoji: '🌱',
+        title: 'No spends yet',
+        caption: 'Nothing logged today',
+      };
+    }
+    if (slide.kind === 'total') {
+      return {
+        id: 'total',
+        emoji: '💰',
+        title: formatRupees(slide.summary.total),
+        caption: `Spent today • ${paymentCount(slide.summary.count)}`,
+      };
+    }
+    return {
+      id: slide.item.category,
+      emoji: emojiFor(slide.item.category),
+      title: slide.item.category,
+      caption: `${formatRupees(slide.item.amount)} • ${paymentCount(
+        slide.item.count,
+      )}`,
+    };
+  });
+}
+
+function HomeFeed({
+  name,
+  transactions,
+  report,
+  ai,
+  onOpenStory,
+  onSeeAllInsights,
+}: {
+  name: string;
+  transactions: Transaction[];
+  report: InsightsReport;
+  ai: AiInsights;
+  onOpenStory: (index: number) => void;
+  onSeeAllInsights: () => void;
+}) {
+  const top = (ai.insights ?? report.insights).slice(0, HOME_INSIGHTS);
   return (
     <ScrollView
       contentContainerStyle={styles.feed}
@@ -99,22 +160,20 @@ function HomeFeed({ onSeeAllInsights }: { onSeeAllInsights: () => void }) {
     >
       <FadeIn index={0}>
         <Text style={styles.greeting}>
-          {greetingFor(new Date())}, {USER_NAME}
+          {greetingFor(new Date())}, {name}
         </Text>
-        <Text style={styles.subGreeting}>
-          You're spending smarter this week.
-        </Text>
+        <Text style={styles.subGreeting}>{report.headline}</Text>
       </FadeIn>
 
       <FadeIn index={1}>
         <View style={styles.firstCard}>
-          <DailyStatusCard status={dailyStatus} />
+          <DailyStatusCard status={report.dailyStatus} />
         </View>
       </FadeIn>
 
       <FadeIn index={2}>
         <SectionTitle title="Today's Story" />
-        <StoryStrip items={todaysStory} />
+        <StoryStrip items={storiesFor(transactions)} onPress={onOpenStory} />
       </FadeIn>
 
       <FadeIn index={3}>
@@ -122,55 +181,84 @@ function HomeFeed({ onSeeAllInsights }: { onSeeAllInsights: () => void }) {
           title="Insights"
           action={{ label: 'SEE ALL', onPress: onSeeAllInsights }}
         />
-        <InsightsCard items={insights} />
+        <InsightsCard items={top} />
+        <AiNote thinking={ai.thinking} written={ai.insights != null} />
       </FadeIn>
 
-      <FadeIn index={4}>
-        <View style={styles.budget}>
-          <DailyBudgetCard budget={dailyBudget} />
-        </View>
-      </FadeIn>
+      {report.dailyBudget ? (
+        <FadeIn index={4}>
+          <View style={styles.budget}>
+            <DailyBudgetCard budget={report.dailyBudget} />
+          </View>
+        </FadeIn>
+      ) : null}
 
-      <FadeIn index={5}>
-        <SectionTitle title="Spending Habits" />
-        <HabitChips habits={habits} />
-      </FadeIn>
+      {report.habits.length > 0 ? (
+        <FadeIn index={5}>
+          <SectionTitle title="Spending Habits" />
+          <HabitChips habits={report.habits} />
+        </FadeIn>
+      ) : null}
     </ScrollView>
-  );
-}
-
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>{title}</Text>
-      <Text style={styles.placeholderText}>Coming soon.</Text>
-    </View>
-  );
-}
-
-function Profile({ onLock }: { onLock: () => void }) {
-  const [statement, setStatement] = useState<ImportedStatement | null>(null);
-
-  useEffect(() => {
-    getStatement().then(setStatement);
-  }, []);
-
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>{USER_NAME}</Text>
-      <Text style={styles.placeholderText}>
-        {statement
-          ? `Statement imported: ${statement.name}`
-          : 'No statement imported yet.'}
-      </Text>
-      <OutlineButton label="LOCK APP" onPress={onLock} style={styles.lock} />
-    </View>
   );
 }
 
 export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
   const [tab, setTab] = useState<TabKey>('home');
+  const [transactions, setTransactions] = useState<Transaction[] | null>(
+    null,
+  );
+  const [budget, setBudget] = useState<Budget | null>(null);
+  const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const toast = useToast();
+
+  const reload = useCallback(async () => {
+    const [txs, savedBudget, savedProfile] = await Promise.all([
+      listTransactions().catch(() => [] as Transaction[]),
+      getBudget().catch(() => null),
+      getProfile().catch(() => DEFAULT_PROFILE),
+    ]);
+    setTransactions(txs);
+    setBudget(savedBudget);
+    setProfile(savedProfile);
+  }, []);
+
+  // Screenshots are logged in the background, and budget/profile are edited on
+  // other screens, so reload on return to the app or this screen, or a tab switch.
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload]),
+  );
+  useEffect(() => {
+    const sub = AppState.addEventListener(
+      'change',
+      state => state === 'active' && reload(),
+    );
+    return () => sub.remove();
+  }, [reload]);
+
+  // The on-device insights model: pure and fast, so it reruns on every change.
+  const report = useMemo(
+    () => (transactions ? buildInsights(transactions, budget) : null),
+    [transactions, budget],
+  );
+
+  // Spendd AI: the optional on-device model rewrites the engine's facts into its own insights.
+  const aiModel = useAiModel();
+  const ai = useAiInsights(
+    report,
+    aiModel.enabled && aiModel.phase === 'ready' ? aiModel.path : null,
+  );
+
+  const openTab = (next: TabKey) => {
+    setTab(next);
+    reload();
+  };
+  const openTransaction = (transaction: Transaction) =>
+    navigation.navigate('TransactionDetails', { transaction });
+  const addTransaction = () => navigation.navigate('AddTransaction');
+  const setBudgetScreen = () => navigation.navigate('SetBudget');
 
   // Android back on another tab returns to Home before leaving the app.
   useFocusEffect(
@@ -195,8 +283,6 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
     }
   }, []);
 
-  const tabTitle = TABS.find(t => t.key === tab)?.label ?? '';
-
   return (
     <Screen>
       {tab === 'transactions' ? null : (
@@ -204,10 +290,10 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open profile"
-            onPress={() => setTab('profile')}
-            style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
+            onPress={() => openTab('profile')}
+            style={({ pressed }) => pressed && styles.pressed}
           >
-            <Text style={styles.avatarInitial}>{USER_NAME.charAt(0)}</Text>
+            <Avatar profile={profile} size={40} round />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -222,29 +308,67 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
       )}
 
       <View style={styles.body}>
-        {tab === 'home' ? (
-          <HomeFeed onSeeAllInsights={() => setTab('insights')} />
+        {!transactions || !report ? null : tab === 'home' ? (
+          <HomeFeed
+            name={profile.name}
+            transactions={transactions}
+            report={report}
+            ai={ai}
+            onOpenStory={startIndex =>
+              navigation.navigate('Story', { startIndex })
+            }
+            onSeeAllInsights={() => openTab('insights')}
+          />
         ) : tab === 'transactions' ? (
           <TransactionsTab
-            onBack={() => setTab('home')}
-            onOpen={transaction =>
-              navigation.navigate('TransactionDetails', { transaction })
-            }
+            transactions={transactions}
+            onReload={reload}
+            onBack={() => openTab('home')}
+            onOpen={openTransaction}
+            onAdd={addTransaction}
             onToast={toast.show}
           />
-        ) : tab === 'profile' ? (
-          <Profile
+        ) : tab === 'insights' ? (
+          <InsightsTab
+            report={report}
+            ai={ai}
+            aiModel={aiModel}
+            transactions={transactions}
+            onOpen={openTransaction}
+            onAdd={addTransaction}
+            onSetBudget={setBudgetScreen}
+            onSetUpAi={() => openTab('profile')}
+          />
+        ) : tab === 'accounts' ? (
+          <AccountsTab
+            transactions={transactions}
+            budget={budget}
+            onOpen={openTransaction}
+            onSetBudget={setBudgetScreen}
+          />
+        ) : (
+          <ProfileTab
+            profile={profile}
+            transactions={transactions}
+            budget={budget}
+            aiModel={aiModel}
+            onEditProfile={() => navigation.navigate('EditProfile')}
+            onSetBudget={setBudgetScreen}
+            onChangePin={() => navigation.navigate('ChangePin')}
             onLock={() =>
               navigation.reset({ index: 0, routes: [{ name: 'Unlock' }] })
             }
+            onReset={() =>
+              navigation.reset({ index: 0, routes: [{ name: 'Intro' }] })
+            }
+            onReload={reload}
+            onToast={toast.show}
           />
-        ) : (
-          <ComingSoon title={tabTitle} />
         )}
         {toast.node}
       </View>
 
-      <TabBar active={tab} onChange={setTab} />
+      <TabBar active={tab} onChange={next => openTab(next)} />
     </Screen>
   );
 }
@@ -259,21 +383,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontFamily: fonts.serif,
-    fontSize: 17,
-    color: colors.inkMuted,
   },
   body: { flex: 1 },
   feed: { paddingHorizontal: 20, paddingTop: 26, paddingBottom: 40 },
@@ -291,20 +400,6 @@ const styles = StyleSheet.create({
   },
   firstCard: { marginTop: 26 },
   budget: { marginTop: 24 },
-  placeholder: { flex: 1, paddingHorizontal: 20, paddingTop: 40 },
-  placeholderTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 31,
-    color: colors.ink,
-  },
-  placeholderText: {
-    fontFamily: fonts.sans,
-    fontSize: 16,
-    lineHeight: 24,
-    color: colors.inkMuted,
-    marginTop: 10,
-  },
-  lock: { marginTop: 32 },
   toast: {
     position: 'absolute',
     alignSelf: 'center',

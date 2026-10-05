@@ -106,6 +106,27 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
+    packaging {
+        jniLibs {
+            // llama.rn ships seven ~10 MB CPU-tuned builds per ABI and picks the best one at runtime,
+            // falling back when one is missing. Keep the generic build plus the two that cover
+            // nearly all phones since 2018 (dotprod) and 2022 (dotprod + i8mm); saves ~40 MB.
+            excludes += [
+                "**/librnllama_v8.so",
+                "**/librnllama_v8_2.so",
+                "**/librnllama_v8_2_i8mm.so",
+                "**/librnllama_v8_2_dotprod_i8mm_hexagon_opencl.so",
+                "**/librnllama_jni_v8.so",
+                "**/librnllama_jni_v8_2.so",
+                "**/librnllama_jni_v8_2_i8mm.so",
+                "**/librnllama_jni_v8_2_dotprod_i8mm_hexagon_opencl.so",
+            ]
+        }
+    }
+    androidResources {
+        // AGP's default ignore list, plus llama.rn's Hexagon DSP kernels (only the hexagon build above uses them).
+        ignoreAssetsPattern "!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:<dir>ggml-hexagon"
+    }
 }
 
 dependencies {

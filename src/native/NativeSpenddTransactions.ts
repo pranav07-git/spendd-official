@@ -5,6 +5,8 @@ import { TurboModuleRegistry } from 'react-native';
 export interface Spec extends TurboModule {
   /** JSON array of logged transactions. */
   list(): Promise<string>;
+  /** Stores a JSON transaction (without id/createdAt); resolves the stored JSON. */
+  add(transactionJson: string): Promise<string>;
   remove(id: string): Promise<boolean>;
   /** Merges a JSON object of fields into a transaction; resolves the updated JSON (or null). */
   update(id: string, patchJson: string): Promise<string | null>;

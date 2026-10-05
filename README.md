@@ -56,6 +56,25 @@ completed from its details screen — no shared screenshot is dropped.
 - Screenshots are deleted right after OCR; only the extracted fields (and OCR text) are kept.
 - The Transactions tab also has **Add a screenshot** for images already in the gallery.
 
+## Insights & Spendd AI (all on-device)
+
+```
+transactions + budget ─▶ insights/engine.ts ─▶ forecast + ~25 detectors (detectors.ts) ─▶ ranked facts
+                                                                                   │
+              optional: Spendd AI (Qwen2.5 0.5B via llama.rn) ◀── fact sheet ──────┘
+                 └─ JSON-schema-constrained output ─▶ aiPrompt.ts drops any insight whose
+                    numbers aren't in the facts ─▶ cached by facts hash ─▶ Home / Insights
+```
+
+- The engine does all the maths (pace, forecast, trends, outliers, repeats, payday, savings rate…);
+  the model only rewrites and combines its facts. Without the model, the engine's insights show as-is.
+- The model (491 MB GGUF) is **not** in the APK. Users download it from **Profile → Spendd AI**
+  (Android DownloadManager, SHA-256 checked) into app storage; it's deleted on uninstall or reset.
+- llama.rn adds ~30 MB of native code per APK: `app/build.gradle` drops its rarely-used CPU variants.
+- **Windows:** llama.rn's postinstall extracts its native libs with `tar`, which fails under Git Bash.
+  Run `npm install` from PowerShell or cmd (Windows' own `tar`), or afterwards run
+  `node node_modules/llama.rn/install/download-native-artifacts.js` from PowerShell.
+
 ## Prerequisites
 
 - Node ≥ 22.11
@@ -63,7 +82,7 @@ completed from its details screen — no shared screenshot is dropped.
 - Android SDK (Android Studio) with `ANDROID_HOME` set and `platform-tools` on `PATH`
 
 ```sh
-npm install
+npm install   # on Windows, from PowerShell or cmd (see "Spendd AI" above)
 ```
 
 ## Run on your Android phone (no APK to copy around)

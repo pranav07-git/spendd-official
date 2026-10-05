@@ -4,13 +4,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './src/navigation/types';
+import { AddTransactionScreen } from './src/screens/AddTransactionScreen';
 import { BiometricScreen } from './src/screens/BiometricScreen';
+import { ChangePinScreen } from './src/screens/ChangePinScreen';
 import { ConfirmPinScreen } from './src/screens/ConfirmPinScreen';
 import { ConsentScreen } from './src/screens/ConsentScreen';
 import { CreatePinScreen } from './src/screens/CreatePinScreen';
+import { EditProfileScreen } from './src/screens/EditProfileScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
 import { IntroScreen } from './src/screens/IntroScreen';
+import { SetBudgetScreen } from './src/screens/SetBudgetScreen';
 import { StatementScreen } from './src/screens/StatementScreen';
+import { StoryScreen } from './src/screens/StoryScreen';
 import { TransactionDetailsScreen } from './src/screens/TransactionDetailsScreen';
 import { UnlockScreen } from './src/screens/UnlockScreen';
 import { clearAppState, isSetupComplete } from './src/storage/appState';
@@ -63,6 +68,11 @@ function App() {
             <Stack.Screen name="Unlock" component={UnlockScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="TransactionDetails" component={TransactionDetailsScreen} />
+            <Stack.Screen name="AddTransaction" component={AddTransactionScreen} />
+            <Stack.Screen name="Story" component={StoryScreen} options={{ animation: 'fade' }} />
+            <Stack.Screen name="SetBudget" component={SetBudgetScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="ChangePin" component={ChangePinScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       ) : (

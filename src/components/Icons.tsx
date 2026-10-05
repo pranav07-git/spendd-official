@@ -215,4 +215,6 @@ export const ChevronRightIcon = (p: StrokeIconProps) => (
 
 export const ChevronLeftIcon = (p: StrokeIconProps) => <StrokeIcon {...p} paths={['M15 5l-7 7 7 7']} />;
 
+export const ChevronForwardIcon = (p: StrokeIconProps) => <StrokeIcon {...p} paths={['M9 5l7 7-7 7']} />;
+
 export const FilterIcon = (p: StrokeIconProps) => <StrokeIcon {...p} paths={['M3 4h18l-7 8.5V19l-4 2v-8.5z']} />;

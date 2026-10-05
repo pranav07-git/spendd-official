@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   AlertTriangleIcon,
   ArrowDownIcon,
@@ -16,7 +16,7 @@ import type {
   Insight,
   InsightKind,
   StoryItem,
-} from '../../data/homeSample';
+} from '../../insights/types';
 import { colors, fonts } from '../../theme';
 
 export const formatRupees = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
@@ -67,7 +67,7 @@ export function SectionTitle({ title, action }: { title: string; action?: { labe
 }
 
 export function DailyStatusCard({ status }: { status: DailyStatus }) {
-  const less = status.changeVsUsualPct <= 0;
+  const less = (status.changeVsUsualPct ?? 0) <= 0;
   const Arrow = less ? ArrowDownIcon : ArrowUpIcon;
   return (
     <View style={[styles.card, styles.cardPadded]}>
@@ -81,23 +81,29 @@ export function DailyStatusCard({ status }: { status: DailyStatus }) {
         <Text style={styles.heroCaption}>safe to spend</Text>
       </View>
 
-      <Text style={styles.statusLine}>
-        Spend below <Text style={styles.underline}>{formatRupees(status.spendBelowToday)}</Text> today to stay on
-        track
-      </Text>
-      <View style={styles.changeRow}>
-        <Arrow size={13} color={colors.ink} strokeWidth={2} />
-        <Text style={styles.changeLabel}>
-          {Math.abs(status.changeVsUsualPct)}% {less ? 'LESS' : 'MORE'} THAN YOUR USUAL SPENDING
+      {status.spendBelowToday != null ? (
+        <Text style={styles.statusLine}>
+          Spend below <Text style={styles.underline}>{formatRupees(status.spendBelowToday)}</Text> today to stay on
+          track
         </Text>
-      </View>
+      ) : (
+        <Text style={styles.statusLine}>Log a few days of spending, or set a budget, to get a daily limit.</Text>
+      )}
+      {status.changeVsUsualPct != null ? (
+        <View style={styles.changeRow}>
+          <Arrow size={13} color={colors.ink} strokeWidth={2} />
+          <Text style={styles.changeLabel}>
+            {Math.abs(status.changeVsUsualPct)}% {less ? 'LESS' : 'MORE'} THAN YOUR USUAL SPENDING
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const STORY_CARD_WIDTH = 160;
 
-export function StoryStrip({ items }: { items: StoryItem[] }) {
+export function StoryStrip({ items, onPress }: { items: StoryItem[]; onPress: (index: number) => void }) {
   return (
     <View style={[styles.card, styles.storyFrame]}>
       <ScrollView
@@ -106,11 +112,14 @@ export function StoryStrip({ items }: { items: StoryItem[] }) {
         snapToInterval={STORY_CARD_WIDTH}
         decelerationRate="fast">
         {items.map((item, i) => (
-          <View
+          <Pressable
             key={item.id}
-            style={[styles.storyCard, i < items.length - 1 && styles.storyDivider]}
-            accessible
-            accessibilityLabel={`${item.title}, ${item.caption}`}>
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title}, ${item.caption}`}
+            accessibilityHint="Opens the story"
+            onPress={() => onPress(i)}
+            android_ripple={{ color: '#1A1A1A' }}
+            style={[styles.storyCard, i < items.length - 1 && styles.storyDivider]}>
             <View style={styles.emojiTile}>
               <Text style={styles.emoji}>{item.emoji}</Text>
             </View>
@@ -118,7 +127,7 @@ export function StoryStrip({ items }: { items: StoryItem[] }) {
               <Text style={styles.storyTitle}>{item.title}</Text>
               <Text style={styles.storyCaption}>{item.caption.toUpperCase()}</Text>
             </View>
-          </View>
+          </Pressable>
         ))}
       </ScrollView>
     </View>
@@ -152,6 +161,25 @@ export function InsightsCard({ items }: { items: Insight[] }) {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+/** Says where the insights above came from: the on-device model, or that it's rewriting them. */
+export function AiNote({ thinking, written }: { thinking: boolean; written: boolean }) {
+  if (!thinking && !written) {
+    return null;
+  }
+  return (
+    <View style={styles.aiNote} accessibilityLiveRegion="polite">
+      {thinking ? (
+        <ActivityIndicator size="small" color={colors.inkMuted} />
+      ) : (
+        <BotIcon size={14} color={colors.inkMuted} strokeWidth={1.8} />
+      )}
+      <Text style={styles.aiNoteText}>
+        {thinking ? 'SPENDD AI IS WRITING YOUR INSIGHTS…' : 'WRITTEN BY SPENDD AI ON YOUR PHONE'}
+      </Text>
     </View>
   );
 }
@@ -194,12 +222,16 @@ export function DailyBudgetCard({ budget }: { budget: DailyBudget }) {
           style={[styles.trackFill, { width: fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
         />
       </View>
-      <Text style={styles.budgetCaption}>WITHOUT AFFECTING YOUR SAVINGS GOAL</Text>
+      <Text style={styles.budgetCaption}>
+        {budget.basis === 'budget' ? 'TO STAY WITHIN YOUR BUDGET' : 'BASED ON YOUR USUAL DAY'}
+      </Text>
 
       {explained ? (
         <Text style={styles.explainer}>
-          This is how much you can spend today and still hit this month’s savings goal. You’ve used {usedPct}% of it so
-          far.
+          {budget.basis === 'budget'
+            ? 'What’s left of your budget, split evenly across the days remaining.'
+            : 'Your average day over the last 30 days. Set a budget on the Accounts tab to plan against a goal instead.'}{' '}
+          You’ve used {usedPct}% of it so far today.
         </Text>
       ) : null}
     </View>
@@ -301,6 +333,9 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     marginTop: 4,
   },
+
+  aiNote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 4 },
+  aiNoteText: { fontFamily: fonts.sansSemiBold, fontSize: 10.5, letterSpacing: 1.6, color: colors.inkMuted },
 
   budgetLabel: { fontFamily: fonts.sansMedium, fontSize: 12, letterSpacing: 2, color: colors.inkMuted },
   budgetAmount: { fontFamily: fonts.serif, fontSize: 34, lineHeight: 46, color: colors.ink, marginTop: 4 },

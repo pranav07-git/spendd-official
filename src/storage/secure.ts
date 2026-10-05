@@ -51,6 +51,10 @@ export async function enableBiometrics(): Promise<void> {
   }
 }
 
+export async function disableBiometrics(): Promise<void> {
+  await Keychain.resetGenericPassword({ service: BIOMETRIC_SERVICE });
+}
+
 export async function isBiometricsEnabled(): Promise<boolean> {
   return Keychain.hasGenericPassword({ service: BIOMETRIC_SERVICE });
 }

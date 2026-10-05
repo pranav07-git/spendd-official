@@ -3,10 +3,9 @@ import { Alert, Pressable, StyleSheet } from 'react-native';
 import { PinEntry } from '../components/PinEntry';
 import { FingerprintIcon } from '../components/Icons';
 import type { ScreenProps } from '../navigation/types';
-import { clearAppState } from '../storage/appState';
-import { clearTransactions } from '../transactions/store';
+import { getProfile } from '../storage/appState';
+import { wipeAllData } from '../storage/reset';
 import {
-  clearSecureData,
   isBiometricsEnabled,
   unlockWithBiometrics,
   verifyPin,
@@ -17,6 +16,7 @@ const LOCKOUT_MS = 30_000;
 
 export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
   const [biometrics, setBiometrics] = useState(false);
+  const [name, setName] = useState<string | null>(null);
   const failedAttempts = useRef(0);
   const lockedUntil = useRef(0);
 
@@ -30,6 +30,12 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
       goHome();
     }
   }, [goHome]);
+
+  useEffect(() => {
+    getProfile()
+      .then(profile => setName(profile.name))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     isBiometricsEnabled().then(enabled => {
@@ -70,7 +76,7 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
           text: 'Reset',
           style: 'destructive',
           onPress: async () => {
-            await Promise.all([clearSecureData(), clearAppState(), clearTransactions()]);
+            await wipeAllData();
             navigation.reset({ index: 0, routes: [{ name: 'Intro' }] });
           },
         },
@@ -81,6 +87,7 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
     <PinEntry
       title="ENTER PIN"
       subtitle="Enter your 4-digit access PIN"
+      greeting={name ? `Hi ${name},` : undefined}
       onComplete={checkPin}
       onForgot={resetApp}
       bottomLeftKey={

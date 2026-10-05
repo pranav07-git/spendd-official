@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PrimaryButton, TextButton } from '../components/Buttons';
+import { Chips } from '../components/Chips';
 import { ChevronLeftIcon } from '../components/Icons';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
+import { categoriesFor, kindFor } from '../transactions/categories';
 import { formatDate, formatTime, initialFor, signedAmount, titleFor } from '../transactions/format';
 import { removeTransaction, updateTransaction } from '../transactions/store';
 import type { Transaction } from '../transactions/types';
@@ -33,6 +35,7 @@ function EditCard({ tx, onSaved }: { tx: Transaction; onSaved: (tx: Transaction)
   const [amount, setAmount] = useState(tx.amount != null ? String(tx.amount) : '');
   const [name, setName] = useState(tx.counterparty ?? '');
   const [direction, setDirection] = useState(tx.direction);
+  const [category, setCategory] = useState(tx.category);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +51,8 @@ function EditCard({ tx, onSaved }: { tx: Transaction; onSaved: (tx: Transaction)
         amount: value,
         counterparty: name.trim() || null,
         direction,
+        category,
+        kind: kindFor(category),
         needsReview: false,
       });
       if (updated) {
@@ -96,6 +101,8 @@ function EditCard({ tx, onSaved }: { tx: Transaction; onSaved: (tx: Transaction)
           </Pressable>
         ))}
       </View>
+      <Text style={styles.label}>CATEGORY</Text>
+      <Chips options={categoriesFor(direction)} selected={category} onSelect={setCategory} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <PrimaryButton label="SAVE" onPress={save} loading={saving} />
     </View>
@@ -138,7 +145,9 @@ export function TransactionDetailsScreen({ navigation, route }: ScreenProps<'Tra
           <Text style={styles.avatarText}>{initialFor(tx)}</Text>
         </View>
         <Text style={styles.name}>{titleFor(tx)}</Text>
-        <Text style={styles.kind}>{tx.kind === 'personal' ? 'PERSONAL TRANSACTION' : 'MERCHANT PAYMENT'}</Text>
+        <Text style={styles.kind}>
+          {tx.manual ? 'ADDED MANUALLY' : tx.kind === 'personal' ? 'PERSONAL TRANSACTION' : 'MERCHANT PAYMENT'}
+        </Text>
 
         {tx.needsReview ? (
           <Text style={styles.review}>
@@ -181,6 +190,15 @@ export function TransactionDetailsScreen({ navigation, route }: ScreenProps<'Tra
           <Row label="TIME">{tx.hasTime ? formatTime(tx.occurredAt) : '—'}</Row>
         </Card>
 
+        {tx.note ? (
+          <Card>
+            <Text style={styles.label}>NOTE</Text>
+            <Text style={styles.noteText} selectable>
+              {tx.note}
+            </Text>
+          </Card>
+        ) : null}
+
         {tx.handle || tx.txnRef || tx.source ? (
           <Card>
             {tx.handle ? <Row label="UPI ID">{tx.handle}</Row> : null}
@@ -189,7 +207,7 @@ export function TransactionDetailsScreen({ navigation, route }: ScreenProps<'Tra
           </Card>
         ) : null}
 
-        {!tx.dateFromReceipt ? (
+        {!tx.dateFromReceipt && !tx.manual ? (
           <Text style={styles.note}>No date was found on the screenshot, so the time it was shared is used.</Text>
         ) : null}
 
@@ -258,6 +276,7 @@ const styles = StyleSheet.create({
   badgeText: { fontFamily: fonts.sansSemiBold, fontSize: 12, letterSpacing: 1, color: '#FFFFFF' },
   description: { fontFamily: fonts.serifItalic, fontSize: 20, color: colors.ink },
   amount: { fontFamily: fonts.serifBold, fontSize: 30, color: colors.ink },
+  noteText: { fontFamily: fonts.sansMedium, fontSize: 16, lineHeight: 23, color: colors.ink, marginTop: -8 },
   note: { fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.inkMuted, textAlign: 'center', marginTop: 4 },
   delete: { marginTop: 20 },
   review: {

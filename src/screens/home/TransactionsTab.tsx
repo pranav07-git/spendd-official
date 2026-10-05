@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  AppState,
   Pressable,
   RefreshControl,
   SectionList,
@@ -9,12 +8,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { errorCodes, isErrorWithCode, pick, types } from '@react-native-documents/picker';
 import { OutlineButton } from '../../components/Buttons';
 import { ChevronLeftIcon, FilterIcon } from '../../components/Icons';
 import { groupByDay, initialFor, matchesQuery, signedAmount, subtitleFor, titleFor } from '../../transactions/format';
-import { importScreenshot, listTransactions } from '../../transactions/store';
+import { importScreenshot } from '../../transactions/store';
 import type { Transaction } from '../../transactions/types';
 import { colors, fonts } from '../../theme';
 
@@ -26,45 +24,30 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 type Props = {
+  /** Loaded and kept fresh by HomeScreen; null until the first load. */
+  transactions: Transaction[] | null;
+  onReload: () => Promise<void>;
   onBack: () => void;
   onOpen: (transaction: Transaction) => void;
+  onAdd: () => void;
   onToast: (message: string) => void;
 };
 
-export function TransactionsTab({ onBack, onOpen, onToast }: Props) {
-  const [transactions, setTransactions] = useState<Transaction[] | null>(null);
+export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd, onToast }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [showFilters, setShowFilters] = useState(false);
   const pendingRefreshes = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const load = useCallback(async () => {
-    try {
-      setTransactions(await listTransactions());
-    } catch {
-      setTransactions([]);
-    }
-  }, []);
-
-  // Screenshots are logged in the background, so reload whenever the user comes back.
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
   useEffect(() => {
-    const sub = AppState.addEventListener('change', state => state === 'active' && load());
     const timers = pendingRefreshes.current;
-    return () => {
-      sub.remove();
-      timers.forEach(clearTimeout);
-    };
-  }, [load]);
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   const refresh = async () => {
     setRefreshing(true);
-    await load();
+    await onReload();
     setRefreshing(false);
   };
 
@@ -74,7 +57,7 @@ export function TransactionsTab({ onBack, onOpen, onToast }: Props) {
       await importScreenshot(file.uri);
       onToast('Logging transaction…');
       // OCR runs in a background worker; check back shortly.
-      pendingRefreshes.current.push(setTimeout(load, 2500), setTimeout(load, 6000));
+      pendingRefreshes.current.push(setTimeout(onReload, 2500), setTimeout(onReload, 6000));
     } catch (e) {
       if (!(isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED)) {
         onToast('Couldn’t open that image');
@@ -177,9 +160,10 @@ export function TransactionsTab({ onBack, onOpen, onToast }: Props) {
               <Text style={styles.emptyTitle}>No transactions yet</Text>
               <Text style={styles.emptyText}>
                 After paying in any UPI or bank app, tap Share on the payment screen and choose Spendd. We’ll read
-                the amount, payee, date and time and log it here.
+                the amount, payee, date and time and log it here. Paid in cash? Add it manually.
               </Text>
               <OutlineButton label="ADD A SCREENSHOT" onPress={addScreenshot} style={styles.emptyButton} />
+              <OutlineButton label="ADD MANUALLY" onPress={onAdd} style={styles.emptyButtonNext} />
             </View>
           ) : transactions !== null ? (
             <Text style={styles.noMatch}>No transactions match your search.</Text>
@@ -187,9 +171,14 @@ export function TransactionsTab({ onBack, onOpen, onToast }: Props) {
         }
         ListFooterComponent={
           transactions && transactions.length > 0 ? (
-            <Pressable accessibilityRole="button" onPress={addScreenshot} hitSlop={8} style={styles.footerAction}>
-              <Text style={styles.footerActionText}>+ ADD A SCREENSHOT</Text>
-            </Pressable>
+            <View style={styles.footerActions}>
+              <Pressable accessibilityRole="button" onPress={addScreenshot} hitSlop={8} style={styles.footerAction}>
+                <Text style={styles.footerActionText}>+ ADD A SCREENSHOT</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={onAdd} hitSlop={8} style={styles.footerAction}>
+                <Text style={styles.footerActionText}>+ ADD MANUALLY</Text>
+              </Pressable>
+            </View>
           ) : undefined
         }
       />
@@ -278,7 +267,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   emptyButton: { alignSelf: 'stretch', marginTop: 28 },
+  emptyButtonNext: { alignSelf: 'stretch', marginTop: 12 },
   noMatch: { fontFamily: fonts.sans, fontSize: 15, color: colors.inkMuted, textAlign: 'center', marginTop: 40 },
-  footerAction: { alignSelf: 'center', paddingVertical: 16, marginTop: 8 },
+  footerActions: { flexDirection: 'row', justifyContent: 'center', gap: 28, marginTop: 8 },
+  footerAction: { paddingVertical: 16 },
   footerActionText: { fontFamily: fonts.sansSemiBold, fontSize: 12, letterSpacing: 2, color: colors.inkMuted },
 });

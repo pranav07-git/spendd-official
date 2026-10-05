@@ -18,6 +18,12 @@ export type RootStackParamList = {
   Unlock: undefined;
   Home: undefined;
   TransactionDetails: { transaction: Transaction };
+  AddTransaction: undefined;
+  /** Index into todaysStory(): 0 is the day's total, then one per category. */
+  Story: { startIndex: number };
+  SetBudget: undefined;
+  EditProfile: undefined;
+  ChangePin: undefined;
 };
 
 export type ScreenProps<T extends keyof RootStackParamList> =
