@@ -1,27 +1,71 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Pressable,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, RefreshControl, SectionList, Text, TextInput, View } from 'react-native';
 import { errorCodes, isErrorWithCode, pick, types } from '@react-native-documents/picker';
-import { OutlineButton } from '../../components/Buttons';
-import { ChevronLeftIcon, FilterIcon } from '../../components/Icons';
-import { groupByDay, initialFor, matchesQuery, signedAmount, subtitleFor, titleFor } from '../../transactions/format';
+import { OutlineButton, PrimaryButton, TextButton } from '../../components/Buttons';
+import { PayeeAvatar } from '../../components/PayeeAvatar';
+import { Chips } from '../../components/Chips';
+import { ChevronLeftIcon, FilterIcon, SearchIcon } from '../../components/Icons';
+import { StoryHeader } from '../../components/Layout';
+import { lifetimeStats } from '../../insights/engine';
+import {
+  addDays,
+  formatDayMonth,
+  formatRupees,
+  LONG_MONTHS,
+  matchesQuery,
+  startOfDay,
+  subtitleFor,
+  titleFor,
+} from '../../transactions/format';
 import { importScreenshot } from '../../transactions/store';
 import type { Transaction } from '../../transactions/types';
-import { colors, fonts } from '../../theme';
+import { makeStyles, radius, SCREEN_PADDING, space, TOUCH_TARGET, type, useTheme } from '../../theme';
+import { TAB_BAR_CLEARANCE } from './TabBar';
 
 type Filter = 'all' | 'debit' | 'credit';
 const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'ALL' },
-  { key: 'debit', label: 'MONEY OUT' },
-  { key: 'credit', label: 'MONEY IN' },
+  { key: 'all', label: 'All' },
+  { key: 'debit', label: 'Spent' },
+  { key: 'credit', label: 'Received' },
 ];
+
+/** "₹420" for a spend, "+₹420" for money in. */
+function rowAmount(tx: Transaction): string {
+  if (tx.amount == null) {
+    return '';
+  }
+  return tx.direction === 'credit' ? `+${formatRupees(tx.amount)}` : formatRupees(tx.amount);
+}
+
+function dayTitle(day: number, now: number): string {
+  const today = startOfDay(now);
+  if (day === today) {
+    return 'Today';
+  }
+  if (day === addDays(today, -1)) {
+    return 'Yesterday';
+  }
+  const label = formatDayMonth(day);
+  return new Date(day).getFullYear() === new Date(now).getFullYear() ? label : `${label} ${new Date(day).getFullYear()}`;
+}
+
+type DayGroup = { title: string; total: number; data: Transaction[] };
+
+/** Newest first, grouped under Today / Yesterday / 12 Oct, with each day's spend total. */
+function groupDays(transactions: Transaction[], now: number = Date.now()): DayGroup[] {
+  const days = new Map<number, Transaction[]>();
+  [...transactions]
+    .sort((a, b) => b.occurredAt - a.occurredAt)
+    .forEach(tx => {
+      const day = startOfDay(tx.occurredAt);
+      days.set(day, [...(days.get(day) ?? []), tx]);
+    });
+  return [...days.entries()].map(([day, data]) => ({
+    title: dayTitle(day, now),
+    total: data.reduce((sum, tx) => sum + (tx.direction === 'debit' && tx.amount != null ? tx.amount : 0), 0),
+    data,
+  }));
+}
 
 type Props = {
   /** Loaded and kept fresh by HomeScreen; null until the first load. */
@@ -31,11 +75,15 @@ type Props = {
   onOpen: (transaction: Transaction) => void;
   onAdd: () => void;
   onToast: (message: string) => void;
+  /** Pre-filled search, e.g. a category opened from the story. */
+  initialQuery?: string;
 };
 
-export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd, onToast }: Props) {
+export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd, onToast, initialQuery = '' }: Props) {
+  const s = useStyles();
+  const { c } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<Filter>('all');
   const [showFilters, setShowFilters] = useState(false);
   const pendingRefreshes = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -55,12 +103,12 @@ export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd,
     try {
       const [file] = await pick({ type: [types.images] });
       await importScreenshot(file.uri);
-      onToast('Logging transaction…');
+      onToast('Reading your screenshot…');
       // OCR runs in a background worker; check back shortly.
       pendingRefreshes.current.push(setTimeout(onReload, 2500), setTimeout(onReload, 6000));
     } catch (e) {
       if (!(isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED)) {
-        onToast('Couldn’t open that image');
+        onToast('Couldn’t open that image. Try another screenshot.');
       }
     }
   };
@@ -68,116 +116,159 @@ export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd,
   const visible = (transactions ?? []).filter(
     tx => (filter === 'all' || tx.direction === filter) && matchesQuery(tx, query),
   );
-  const sections = groupByDay(visible);
+  const sections = groupDays(visible);
   const isEmpty = transactions !== null && transactions.length === 0;
 
+  const thisMonth = transactions && transactions.length > 0 ? lifetimeStats(transactions).thisMonth : 0;
+  const monthName = LONG_MONTHS[new Date().getMonth()];
+  const story =
+    isEmpty
+        ? 'No spends yet. Share your next UPI screenshot to start.'
+        : thisMonth > 0
+          ? `${formatRupees(Math.round(thisMonth))} spent in ${monthName}.`
+          : `Nothing spent in ${monthName} yet.`;
+  const caption = transactions && !isEmpty ? `${transactions.length} ${transactions.length === 1 ? 'payment' : 'payments'} logged so far.` : null;
+
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back to home" hitSlop={12} onPress={onBack}>
-          <ChevronLeftIcon size={26} color={colors.ink} strokeWidth={2} />
+    <View style={s.root}>
+      <View style={s.header}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to home"
+          onPress={onBack}
+          style={({ pressed }) => [s.iconButton, pressed && s.pressed]}>
+          <ChevronLeftIcon size={24} color={c.ink} strokeWidth={2} />
         </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
+        <Text style={s.title} accessibilityRole="header">
           Transactions
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Filter transactions"
+          accessibilityLabel={filter === 'all' ? 'Filter transactions' : `Filter transactions, showing ${FILTERS.find(f => f.key === filter)!.label.toLowerCase()}`}
           accessibilityState={{ expanded: showFilters }}
-          hitSlop={12}
-          onPress={() => setShowFilters(s => !s)}>
-          <FilterIcon size={24} color={filter === 'all' ? colors.ink : colors.glow} strokeWidth={1.8} />
+          onPress={() => setShowFilters(open => !open)}
+          style={({ pressed }) => [s.iconButton, filter !== 'all' && s.iconButtonActive, pressed && s.pressed]}>
+          <FilterIcon size={22} color={c.ink} strokeWidth={1.8} />
         </Pressable>
       </View>
 
       <SectionList
         sections={sections}
         keyExtractor={tx => tx.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={s.list}
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.ink} colors={[colors.background]} progressBackgroundColor={colors.ink} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={c.ink}
+            colors={[c.ink]}
+            progressBackgroundColor={c.surface}
+          />
         }
         ListHeaderComponent={
           <>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="SEARCH TRANSACTIONS"
-              placeholderTextColor="#6B6B6B"
-              style={[styles.search, query ? styles.searchFilled : null]}
-              returnKeyType="search"
-              autoCorrect={false}
-              accessibilityLabel="Search transactions"
-            />
+            {transactions && !isEmpty ? <StoryHeader story={story} caption={caption} style={s.story} /> : null}
+            {isEmpty ? null : (
+              <View style={s.search}>
+                <SearchIcon size={20} color={c.inkMuted} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search spends"
+                  placeholderTextColor={c.inkSubtle}
+                  style={s.searchInput}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                  accessibilityLabel="Search transactions"
+                />
+              </View>
+            )}
             {showFilters ? (
-              <View style={styles.filters}>
-                {FILTERS.map(f => (
-                  <Pressable
-                    key={f.key}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: filter === f.key }}
-                    onPress={() => setFilter(f.key)}
-                    style={[styles.filterChip, filter === f.key && styles.filterChipActive]}>
-                    <Text style={[styles.filterLabel, filter === f.key && styles.filterLabelActive]}>{f.label}</Text>
-                  </Pressable>
-                ))}
+              <View style={s.filters}>
+                <Chips
+                  options={FILTERS.map(f => f.label)}
+                  selected={FILTERS.find(f => f.key === filter)!.label}
+                  onSelect={label => setFilter(FILTERS.find(f => f.label === label)!.key)}
+                />
               </View>
             ) : null}
           </>
         }
-        renderSectionHeader={({ section }) => <Text style={styles.sectionLabel}>{section.title}</Text>}
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${titleFor(item)}, ${signedAmount(item)}, ${subtitleFor(item)}`}
-            onPress={() => onOpen(item)}
-            android_ripple={{ color: '#222222' }}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initialFor(item)}</Text>
-            </View>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle} numberOfLines={1}>
-                {titleFor(item)}
-              </Text>
-              <Text style={styles.rowSubtitle} numberOfLines={1}>
-                {item.needsReview ? 'NEEDS REVIEW • ' : ''}
-                {subtitleFor(item).toUpperCase()}
-              </Text>
-            </View>
-            {item.amount == null ? (
-              <Text style={styles.rowAddAmount}>Add amount</Text>
-            ) : (
-              <Text style={styles.rowAmount}>{signedAmount(item)}</Text>
-            )}
-          </Pressable>
+        renderSectionHeader={({ section }) => (
+          <View style={s.dayHeader} accessible accessibilityRole="header">
+            <Text style={s.dayTitle}>{section.title}</Text>
+            {section.total > 0 ? <Text style={s.dayTotal}>{formatRupees(Math.round(section.total))}</Text> : null}
+          </View>
         )}
+        renderItem={({ item, index, section }) => {
+          const credit = item.direction === 'credit';
+          const first = index === 0;
+          const last = index === section.data.length - 1;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${titleFor(item)}, ${
+                item.amount == null ? 'amount missing' : `${formatRupees(item.amount)} ${credit ? 'received' : 'spent'}`
+              }, ${subtitleFor(item)}${item.needsReview ? ', needs a look' : ''}`}
+              onPress={() => onOpen(item)}
+              android_ripple={{ color: c.surfaceSunken }}
+              style={({ pressed }) => [
+                s.row,
+                first && s.rowFirst,
+                last && s.rowLast,
+                !first && s.rowDivider,
+                pressed && s.rowPressed,
+              ]}>
+              <PayeeAvatar tx={item} />
+              <View style={s.rowText}>
+                <Text style={s.rowTitle} numberOfLines={1}>
+                  {titleFor(item)}
+                </Text>
+                <View style={s.metaLine}>
+                  {item.needsReview ? (
+                    <View style={s.tag}>
+                      <Text style={s.tagText}>Needs a look</Text>
+                    </View>
+                  ) : null}
+                  <Text style={s.rowMeta} numberOfLines={1}>
+                    {subtitleFor(item)}
+                  </Text>
+                </View>
+              </View>
+              {item.amount == null ? (
+                <Text style={s.rowAddAmount}>Add amount</Text>
+              ) : (
+                <Text style={[s.rowAmount, credit && s.rowAmountIn]}>{rowAmount(item)}</Text>
+              )}
+            </Pressable>
+          );
+        }}
         ListEmptyComponent={
           isEmpty ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>No transactions yet</Text>
-              <Text style={styles.emptyText}>
+            <View style={s.empty}>
+              <StoryHeader story={story} />
+              <Text style={s.emptyText}>
                 After paying in any UPI or bank app, tap Share on the payment screen and choose Spendd. We’ll read
-                the amount, payee, date and time and log it here. Paid in cash? Add it manually.
+                the amount, payee, date and time and log it here. Paid in cash? Add it yourself.
               </Text>
-              <OutlineButton label="ADD A SCREENSHOT" onPress={addScreenshot} style={styles.emptyButton} />
-              <OutlineButton label="ADD MANUALLY" onPress={onAdd} style={styles.emptyButtonNext} />
+              <PrimaryButton label="Add a screenshot" onPress={addScreenshot} style={s.emptyButton} />
+              <OutlineButton label="Add manually" onPress={onAdd} style={s.emptyButtonNext} />
             </View>
           ) : transactions !== null ? (
-            <Text style={styles.noMatch}>No transactions match your search.</Text>
+            <Text style={s.noMatch}>
+              {query.trim()
+                ? `Nothing matches “${query.trim()}”. Try a payee, category or amount.`
+                : 'Nothing here with this filter. Try All.'}
+            </Text>
           ) : undefined
         }
         ListFooterComponent={
           transactions && transactions.length > 0 ? (
-            <View style={styles.footerActions}>
-              <Pressable accessibilityRole="button" onPress={addScreenshot} hitSlop={8} style={styles.footerAction}>
-                <Text style={styles.footerActionText}>+ ADD A SCREENSHOT</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={onAdd} hitSlop={8} style={styles.footerAction}>
-                <Text style={styles.footerActionText}>+ ADD MANUALLY</Text>
-              </Pressable>
+            <View style={s.footerActions}>
+              <TextButton label="Add a screenshot" onPress={addScreenshot} />
+              <TextButton label="Add manually" onPress={onAdd} />
             </View>
           ) : undefined
         }
@@ -186,90 +277,78 @@ export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd,
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
+const useStyles = makeStyles(c => ({
+  root: { flex: 1, backgroundColor: c.bg },
   header: {
-    height: 72,
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
+    paddingHorizontal: SCREEN_PADDING - 10,
   },
-  title: { fontFamily: fonts.serifBold, fontSize: 24, color: colors.ink },
-  list: { paddingHorizontal: 18, paddingTop: 26, paddingBottom: 32 },
-  search: {
-    height: 54,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#8A8A8A',
-    backgroundColor: colors.ink,
-    paddingHorizontal: 22,
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 14,
-    letterSpacing: 2,
-    color: colors.background,
-  },
-  searchFilled: { fontFamily: fonts.sansMedium, fontSize: 15, letterSpacing: 0 },
-  filters: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  filterChip: {
-    height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
+  iconButton: {
+    width: TOUCH_TARGET,
+    height: TOUCH_TARGET,
+    borderRadius: radius.s,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  filterChipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  filterLabel: { fontFamily: fonts.sansSemiBold, fontSize: 11, letterSpacing: 1.5, color: colors.inkMuted },
-  filterLabelActive: { color: colors.background },
-  sectionLabel: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 13,
-    letterSpacing: 1.5,
-    color: colors.ink,
-    marginTop: 32,
-    marginBottom: 18,
-  },
-  row: {
-    height: 80,
+  iconButtonActive: { backgroundColor: c.surfaceSunken },
+  pressed: { opacity: 0.7 },
+  title: { ...type.title, color: c.ink },
+  list: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: TAB_BAR_CLEARANCE },
+  story: { marginBottom: space[6] },
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#151515',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    gap: space[2],
+    minHeight: 48,
+    borderRadius: radius.m,
+    backgroundColor: c.surfaceSunken,
+    paddingHorizontal: space[4],
   },
-  rowPressed: { backgroundColor: '#1B1B1B' },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#2A2A2A',
+  searchInput: { ...type.body, flex: 1, color: c.ink, paddingVertical: space[2] },
+  filters: { marginTop: space[3] },
+  dayHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: space[6],
+    marginBottom: space[2],
+  },
+  dayTitle: { ...type.label, color: c.inkMuted },
+  dayTotal: { ...type.caption, color: c.inkMuted, fontVariant: ['tabular-nums'] },
+  row: {
+    minHeight: 64,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: space[3],
+    backgroundColor: c.surface,
+    paddingHorizontal: space[4],
+    paddingVertical: space[2],
   },
-  avatarText: { fontFamily: fonts.sansSemiBold, fontSize: 18, color: colors.ink },
-  rowText: { flex: 1, marginLeft: 16, marginRight: 8 },
-  rowTitle: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: colors.ink },
-  rowSubtitle: { fontFamily: fonts.sans, fontSize: 12, color: colors.inkMuted, marginTop: 3 },
-  rowAmount: { fontFamily: fonts.sansSemiBold, fontSize: 18, color: colors.ink },
-  rowAddAmount: { fontFamily: fonts.sansSemiBold, fontSize: 13, letterSpacing: 0.5, color: colors.glow },
-  empty: { paddingTop: 48, alignItems: 'center' },
-  emptyTitle: { fontFamily: fonts.serif, fontSize: 26, color: colors.ink },
-  emptyText: {
-    fontFamily: fonts.sans,
-    fontSize: 15,
-    lineHeight: 23,
-    color: colors.inkMuted,
-    textAlign: 'center',
-    marginTop: 12,
-    paddingHorizontal: 8,
+  rowFirst: { borderTopLeftRadius: radius.m, borderTopRightRadius: radius.m },
+  rowLast: { borderBottomLeftRadius: radius.m, borderBottomRightRadius: radius.m },
+  rowDivider: { borderTopWidth: 1, borderTopColor: c.line },
+  rowPressed: { backgroundColor: c.surfaceSunken },
+  rowText: { flex: 1 },
+  rowTitle: { ...type.bodyStrong, color: c.ink },
+  metaLine: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  rowMeta: { ...type.caption, color: c.inkMuted, flexShrink: 1 },
+  tag: {
+    borderRadius: radius.s,
+    borderWidth: 1,
+    borderColor: c.headsup,
+    paddingHorizontal: space[1] + 2,
   },
-  emptyButton: { alignSelf: 'stretch', marginTop: 28 },
-  emptyButtonNext: { alignSelf: 'stretch', marginTop: 12 },
-  noMatch: { fontFamily: fonts.sans, fontSize: 15, color: colors.inkMuted, textAlign: 'center', marginTop: 40 },
-  footerActions: { flexDirection: 'row', justifyContent: 'center', gap: 28, marginTop: 8 },
-  footerAction: { paddingVertical: 16 },
-  footerActionText: { fontFamily: fonts.sansSemiBold, fontSize: 12, letterSpacing: 2, color: colors.inkMuted },
-});
+  tagText: { ...type.caption, fontSize: 12, lineHeight: 16, color: c.headsup },
+  rowAmount: { ...type.amount, color: c.ink },
+  rowAmountIn: { color: c.peacock },
+  rowAddAmount: { ...type.label, color: c.headsup },
+  empty: { paddingTop: space[4] },
+  emptyText: { ...type.body, color: c.inkMuted, marginTop: space[4] },
+  emptyButton: { marginTop: space[8] },
+  emptyButtonNext: { marginTop: space[3] },
+  noMatch: { ...type.body, color: c.inkMuted, textAlign: 'center', marginTop: space[10] },
+  footerActions: { flexDirection: 'row', justifyContent: 'center', gap: space[4], marginTop: space[4] },
+}));

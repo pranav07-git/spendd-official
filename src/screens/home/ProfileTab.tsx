@@ -1,29 +1,37 @@
 import { useCallback, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Avatar } from '../../components/Avatar';
 import { TextButton } from '../../components/Buttons';
+import { Chips } from '../../components/Chips';
 import { ChevronForwardIcon } from '../../components/Icons';
-import { AI_MODEL } from '../../insights/aiPrompt';
+import { Card, PrivacyBadge, SectionHeading } from '../../components/Layout';
 import { lifetimeStats } from '../../insights/engine';
-import type { AiModel } from '../../insights/useAiModel';
-import { getStatement, type ImportedStatement, type Profile } from '../../storage/appState';
+import type { Profile } from '../../storage/appState';
 import { wipeAllData } from '../../storage/reset';
 import { disableBiometrics, enableBiometrics, getBiometryType, isBiometricsEnabled } from '../../storage/secure';
 import { budgetStatus, type Budget } from '../../transactions/budget';
-import { emojiFor } from '../../transactions/categories';
 import { transactionsToCsv } from '../../transactions/csv';
 import { formatDate, formatRupees } from '../../transactions/format';
 import { clearTransactions } from '../../transactions/store';
 import type { Transaction } from '../../transactions/types';
-import { colors, fonts } from '../../theme';
-import { FadeIn, SectionTitle } from './HomeSections';
+import {
+  makeStyles,
+  SCREEN_PADDING,
+  SECTION_GAP,
+  space,
+  type,
+  useTheme,
+  type Palette,
+  type ThemePreference,
+} from '../../theme';
+import { FadeIn } from './HomeSections';
+import { TAB_BAR_CLEARANCE } from './TabBar';
 
 type Props = {
   profile: Profile;
   transactions: Transaction[];
   budget: Budget | null;
-  aiModel: AiModel;
   onEditProfile: () => void;
   onSetBudget: () => void;
   onChangePin: () => void;
@@ -35,6 +43,18 @@ type Props = {
 };
 
 const PERIOD_NAME: Record<Budget['period'], string> = { month: 'Monthly', week: 'Weekly', custom: 'Custom' };
+
+const THEMES: { key: ThemePreference; label: string }[] = [
+  { key: 'system', label: 'System' },
+  { key: 'light', label: 'Light' },
+  { key: 'dark', label: 'Dark' },
+];
+
+/** On = peacock track; the thumb stays readable in both modes. */
+const switchColors = (c: Palette, isDark: boolean) => ({
+  trackColor: { false: c.line, true: c.peacock },
+  thumbColor: isDark ? c.ink : c.surface,
+});
 
 function Row({
   label,
@@ -51,17 +71,15 @@ function Row({
   right?: ReactNode;
   first?: boolean;
 }) {
+  const s = useStyles();
+  const { c } = useTheme();
   const content = (
     <>
-      <View style={styles.rowText}>
-        <Text style={[styles.rowLabel, danger && styles.danger]}>{label}</Text>
-        {value ? (
-          <Text style={styles.rowValue} numberOfLines={1}>
-            {value}
-          </Text>
-        ) : null}
+      <View style={s.rowText}>
+        <Text style={[s.rowLabel, danger && s.danger]}>{label}</Text>
+        {value ? <Text style={s.rowValue}>{value}</Text> : null}
       </View>
-      {right ?? (onPress ? <ChevronForwardIcon size={18} color={danger ? colors.danger : colors.inkMuted} strokeWidth={2} /> : null)}
+      {right ?? (onPress ? <ChevronForwardIcon size={18} color={danger ? c.low : c.inkMuted} strokeWidth={2} /> : null)}
     </>
   );
   return onPress ? (
@@ -69,112 +87,40 @@ function Row({
       accessibilityRole="button"
       accessibilityLabel={value ? `${label}, ${value}` : label}
       onPress={onPress}
-      android_ripple={{ color: '#1A1A1A' }}
-      style={[styles.row, !first && styles.rowDivider]}>
+      android_ripple={{ color: c.surfaceSunken }}
+      style={({ pressed }) => [s.row, !first && s.rowDivider, pressed && s.rowPressed]}>
       {content}
     </Pressable>
   ) : (
-    <View style={[styles.row, !first && styles.rowDivider]} accessible accessibilityLabel={value ? `${label}, ${value}` : label}>
+    <View style={[s.row, !first && s.rowDivider]} accessible accessibilityLabel={value ? `${label}, ${value}` : label}>
       {content}
     </View>
   );
 }
 
-const mb = (bytes: number) => Math.round(bytes / 1e6);
-
-/** Download, switch on/off, and delete the on-device model. */
-function AiSection({ ai, onToast }: { ai: AiModel; onToast: (message: string) => void }) {
-  const confirmDownload = () => {
-    const lowRam = ai.memoryBytes != null && ai.memoryBytes < AI_MODEL.minMemoryBytes;
-    Alert.alert(
-      'Download Spendd AI?',
-      `Spendd AI is a small language model (${AI_MODEL.name}) that runs entirely on your phone and writes personal insights from your spending. Nothing is sent anywhere.
-
-It’s a one-time ${mb(AI_MODEL.bytes)} MB download, so Wi-Fi is best.${
-        lowRam ? `
-
-Your phone has ${(ai.memoryBytes! / 1024 ** 3).toFixed(1)} GB of RAM, so Spendd AI may be slow on it.` : ''
-      }`,
-      [
-        { text: 'Not now', style: 'cancel' },
-        {
-          text: 'Download',
-          onPress: () => ai.download().catch(() => onToast('Couldn’t start the download')),
-        },
-      ],
-    );
-  };
-
-  const confirmDelete = () =>
-    Alert.alert('Delete Spendd AI?', `This frees ${mb(AI_MODEL.bytes)} MB. Insights go back to Spendd’s built-in engine.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => ai.remove() },
-    ]);
-
-  switch (ai.phase) {
-    case 'checking':
-      return <Row first label="Spendd AI" value="Checking…" />;
-    case 'none':
-      return (
-        <Row first label="Get Spendd AI" value={`AI insights written on your phone • ${mb(AI_MODEL.bytes)} MB`} onPress={confirmDownload} />
-      );
-    case 'failed':
-      return <Row first label="Spendd AI" value={`${ai.reason ?? 'Download failed'}. Tap to try again.`} onPress={confirmDownload} />;
-    case 'downloading':
-    case 'paused': {
-      const pct = ai.totalBytes > 0 ? Math.floor((ai.downloadedBytes / ai.totalBytes) * 100) : 0;
-      return (
-        <>
-          <Row
-            first
-            label="Downloading Spendd AI"
-            value={
-              ai.phase === 'paused'
-                ? `Waiting for a connection • ${pct}%`
-                : `${pct}% • ${mb(ai.downloadedBytes)} of ${mb(ai.totalBytes)} MB`
-            }
-          />
-          <View
-            style={styles.progressTrack}
-            accessibilityRole="progressbar"
-            accessibilityValue={{ min: 0, max: 100, now: pct }}>
-            <View style={[styles.progressFill, { width: `${pct}%` }]} />
-          </View>
-          <Row label="Cancel download" danger onPress={() => ai.cancel()} />
-        </>
-      );
-    }
-    case 'verifying':
-      return <Row first label="Spendd AI" value="Checking the download…" right={<ActivityIndicator color={colors.ink} />} />;
-    case 'ready':
-      return (
-        <>
-          <Row
-            first
-            label="Spendd AI"
-            value={ai.enabled ? 'On • writes your insights on this phone' : 'Off • using the built-in engine'}
-            right={
-              <Switch
-                value={ai.enabled}
-                onValueChange={on => ai.setEnabled(on)}
-                trackColor={{ false: colors.track, true: colors.ink }}
-                thumbColor={ai.enabled ? colors.background : colors.inkMuted}
-                accessibilityLabel="Spendd AI"
-              />
-            }
-          />
-          <Row label="Model" value={`${AI_MODEL.name} • ${mb(AI_MODEL.bytes)} MB on this phone`} />
-          <Row label="Delete model" danger onPress={confirmDelete} />
-        </>
-      );
-  }
+/** What Spendd AI sends, and how it learns. */
+function AiSection() {
+  return (
+    <>
+      <Row
+        first
+        label="What’s sent"
+        value="Monthly totals, and the names and UPI IDs of businesses you pay. Never screenshots, your transaction list, or anything about people you pay."
+      />
+      <Row
+        label="Learning"
+        value="When you change a payment’s category, Spendd uses it for that payee from then on. This stays on your phone."
+      />
+    </>
+  );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  const s = useStyles();
   return (
-    <View style={styles.stat} accessible accessibilityLabel={`${label}: ${value}`}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+    <View style={s.stat} accessible accessibilityLabel={`${label}: ${value}`}>
+      <Text style={s.statLabel}>{label}</Text>
+      <Text style={s.statValue} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
     </View>
@@ -186,7 +132,6 @@ export function ProfileTab({
   profile,
   transactions,
   budget,
-  aiModel,
   onEditProfile,
   onSetBudget,
   onChangePin,
@@ -195,15 +140,15 @@ export function ProfileTab({
   onReload,
   onToast,
 }: Props) {
-  const [statement, setStatement] = useState<ImportedStatement | null>(null);
+  const s = useStyles();
+  const { c, isDark, preference, setPreference } = useTheme();
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricsOn, setBiometricsOn] = useState(false);
   const [togglingBiometrics, setTogglingBiometrics] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      getStatement().then(setStatement, () => setStatement(null));
-      getBiometryType().then(type => setBiometricsAvailable(type != null), () => setBiometricsAvailable(false));
+      getBiometryType().then(kind => setBiometricsAvailable(kind != null), () => setBiometricsAvailable(false));
       isBiometricsEnabled().then(setBiometricsOn, () => setBiometricsOn(false));
     }, []),
   );
@@ -277,142 +222,142 @@ export function ProfileTab({
     );
 
   return (
-    <ScrollView contentContainerStyle={styles.feed} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={s.feed} showsVerticalScrollIndicator={false}>
       <FadeIn index={0}>
-        <View style={styles.identity}>
-          <Avatar profile={profile} size={96} />
-          <Text style={styles.name} accessibilityRole="header">
-            {profile.name}
-          </Text>
-          <Text style={styles.since}>
-            {stats.since != null ? `TRACKING SINCE ${formatDate(stats.since).toUpperCase()}` : 'NEW TO SPENDD'}
-          </Text>
-          <TextButton label="EDIT PROFILE" color={colors.ink} onPress={onEditProfile} />
+        <View style={s.identity}>
+          <Avatar profile={profile} size={80} />
+          <View style={s.identityText}>
+            <Text style={s.name} accessibilityRole="header" numberOfLines={2}>
+              {profile.name}
+            </Text>
+            <Text style={s.since}>
+              {stats.since != null ? `Tracking since ${formatDate(stats.since)}` : 'New to Spendd'}
+            </Text>
+          </View>
         </View>
+        <TextButton label="Edit profile" onPress={onEditProfile} style={s.editProfile} />
       </FadeIn>
 
       <FadeIn index={1}>
-        <View style={styles.card}>
-          <View style={styles.statRow}>
-            <Stat label="THIS MONTH" value={formatRupees(Math.round(stats.thisMonth))} />
-            <Stat label="ALL TIME" value={formatRupees(Math.round(stats.totalSpent))} />
+        <Card padded={false} style={s.statsCard}>
+          <View style={s.statRow}>
+            <Stat label="Spent this month" value={formatRupees(Math.round(stats.thisMonth))} />
+            <Stat label="Spent all time" value={formatRupees(Math.round(stats.totalSpent))} />
           </View>
-          <View style={[styles.statRow, styles.rowDivider]}>
-            <Stat label="TRANSACTIONS" value={String(stats.transactions)} />
+          <View style={[s.statRow, s.rowDivider]}>
+            <Stat label="Payments logged" value={String(stats.transactions)} />
             <Stat
-              label="TOP CATEGORY"
-              value={stats.topCategory ? `${emojiFor(stats.topCategory)} ${stats.topCategory}` : '—'}
+              label="Top category"
+              value={stats.topCategory ?? '—'}
             />
           </View>
-          <View style={[styles.statRow, styles.rowDivider]}>
-            <Stat label="DAYS TRACKED" value={String(stats.daysTracked)} />
-            <Stat
-              label="BUDGET USED"
-              value={status ? `${Math.round(status.usedFraction * 100)}%` : '—'}
-            />
+          <View style={[s.statRow, s.rowDivider]}>
+            <Stat label="Days tracked" value={String(stats.daysTracked)} />
+            <Stat label="Budget used" value={status ? `${Math.round(status.usedFraction * 100)}%` : '—'} />
           </View>
-        </View>
+        </Card>
       </FadeIn>
 
       <FadeIn index={2}>
-        <SectionTitle title="Budget" />
-        <View style={styles.card}>
+        <SectionHeading title="Budget" />
+        <Card padded={false}>
           <Row
             first
             label={budget ? `${PERIOD_NAME[budget.period]} budget` : 'No budget set'}
             value={
               budget && status
                 ? `${formatRupees(budget.amount)} • ${status.period.label}`
-                : 'Set one to get daily limits and alerts'
+                : 'Set one to get a daily limit and heads-ups'
             }
             onPress={onSetBudget}
           />
-        </View>
+        </Card>
 
-        <SectionTitle title="Spendd AI" />
-        <View style={styles.card}>
-          <AiSection ai={aiModel} onToast={onToast} />
-        </View>
+        <SectionHeading title="Spendd Data Processing" />
+        <Card padded={false}>
+          <AiSection />
+        </Card>
 
-        <SectionTitle title="Security" />
-        <View style={styles.card}>
+        <SectionHeading title="Appearance" />
+        <Card padded={false}>
+          <View style={s.themeRow}>
+            <Text style={s.rowLabel}>Theme</Text>
+            <Text style={s.rowValue}>
+              {preference === 'system' ? 'Follows your phone’s setting' : `Always ${preference}`}
+            </Text>
+            <View style={s.themeChips}>
+              <Chips
+                options={THEMES.map(t => t.label)}
+                selected={THEMES.find(t => t.key === preference)!.label}
+                onSelect={label => setPreference(THEMES.find(t => t.label === label)!.key)}
+              />
+            </View>
+          </View>
+        </Card>
+
+        <SectionHeading title="Security" />
+        <Card padded={false}>
           <Row first label="Change PIN" onPress={onChangePin} />
           <Row
             label="Biometric unlock"
             value={biometricsAvailable ? 'Fingerprint or face to unlock' : 'Not set up on this phone'}
             right={
               togglingBiometrics ? (
-                <ActivityIndicator color={colors.ink} />
+                <ActivityIndicator color={c.ink} />
               ) : (
                 <Switch
                   value={biometricsOn}
                   disabled={!biometricsAvailable && !biometricsOn}
                   onValueChange={toggleBiometrics}
-                  trackColor={{ false: colors.track, true: colors.ink }}
-                  thumbColor={biometricsOn ? colors.background : colors.inkMuted}
+                  {...switchColors(c, isDark)}
                   accessibilityLabel="Biometric unlock"
                 />
               )
             }
           />
           <Row label="Lock app now" onPress={onLock} />
-        </View>
+        </Card>
 
-        <SectionTitle title="Your Data" />
-        <View style={styles.card}>
-          <Row
-            first
-            label="Bank statement"
-            value={statement ? `${statement.name} • ${formatDate(Date.parse(statement.importedAt))}` : 'None imported'}
-          />
+        <SectionHeading title="Your data" />
+        <Card padded={false}>
           <Row label="Export transactions" value="As a CSV for Excel or Sheets" onPress={exportCsv} />
           <Row label="Clear all transactions" danger onPress={confirmClear} />
           <Row label="Reset Spendd" value="Erase everything on this phone" danger onPress={confirmReset} />
-        </View>
+        </Card>
 
-        <Text style={styles.footer}>YOUR DATA AND INSIGHTS STAY ON THIS PHONE</Text>
+        <PrivacyBadge text="Your data and insights stay on this phone." style={s.footer} />
       </FadeIn>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  feed: { paddingHorizontal: 20, paddingTop: 32, paddingBottom: 40 },
-  identity: { alignItems: 'center', marginBottom: 24 },
-  name: {
-    fontFamily: fonts.serifBold,
-    fontSize: 30,
-    lineHeight: 40,
-    color: colors.ink,
-    textAlign: 'center',
-    marginTop: 20,
-  },
-  since: { fontFamily: fonts.sans, fontSize: 12, letterSpacing: 2, color: colors.inkMuted, marginTop: 6 },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
+const useStyles = makeStyles(c => ({
+  feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[6], paddingBottom: TAB_BAR_CLEARANCE },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
+  identityText: { flex: 1 },
+  name: { ...type.story, color: c.ink },
+  since: { ...type.caption, color: c.inkMuted, marginTop: space[1] },
+  editProfile: { alignSelf: 'flex-start', paddingHorizontal: 0, marginTop: space[2], marginBottom: space[4] },
+  statsCard: { marginTop: space[2] },
   statRow: { flexDirection: 'row' },
-  stat: { flex: 1, paddingHorizontal: 20, paddingVertical: 18 },
-  statLabel: { fontFamily: fonts.sansMedium, fontSize: 11, letterSpacing: 2, color: colors.inkMuted },
-  statValue: { fontFamily: fonts.serif, fontSize: 24, lineHeight: 32, color: colors.ink, marginTop: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingHorizontal: 20, paddingVertical: 14, gap: 12 },
-  rowDivider: { borderTopWidth: 1, borderTopColor: colors.divider },
-  rowText: { flex: 1 },
-  rowLabel: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
-  rowValue: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.inkMuted, marginTop: 3 },
-  danger: { color: colors.danger },
-  progressTrack: { height: 4, backgroundColor: colors.track, marginHorizontal: 20, marginBottom: 16, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: colors.ink },
-  footer: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 10.5,
-    letterSpacing: 2,
-    color: colors.inkFaint,
-    textAlign: 'center',
-    marginTop: 32,
+  stat: { flex: 1, paddingHorizontal: space[4], paddingVertical: space[4] },
+  statLabel: { ...type.caption, color: c.inkMuted },
+  statValue: { ...type.amountMedium, color: c.ink, marginTop: space[1] },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 64,
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    gap: space[3],
   },
-});
+  rowPressed: { backgroundColor: c.surfaceSunken },
+  rowDivider: { borderTopWidth: 1, borderTopColor: c.line },
+  rowText: { flex: 1 },
+  rowLabel: { ...type.bodyStrong, color: c.ink },
+  rowValue: { ...type.caption, color: c.inkMuted, marginTop: 2 },
+  danger: { color: c.low },
+  themeRow: { paddingHorizontal: space[4], paddingVertical: space[4] },
+  themeChips: { marginTop: space[3] },
+  footer: { alignSelf: 'center', marginTop: SECTION_GAP },
+}));

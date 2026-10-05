@@ -22,21 +22,5 @@ export const categoriesFor = (direction: Transaction['direction']): string[] =>
 /** "Personal" means money to or from a person; everything else is a merchant. */
 export const kindFor = (category: string): Transaction['kind'] => (category === 'Personal' ? 'personal' : 'merchant');
 
-const EMOJI: Record<string, string> = {
-  Food: '🍔',
-  Groceries: '🛒',
-  Medical: '💊',
-  Travel: '🚕',
-  Shopping: '🛍️',
-  Bills: '🧾',
-  Rent: '🏠',
-  Education: '📚',
-  Entertainment: '🎬',
-  Personal: '👤',
-  Salary: '💼',
-  Refund: '↩️',
-};
-
-export const emojiFor = (category: string) => EMOJI[category] ?? '💸';
-
+// Category icons: see src/components/CategoryGlyph.tsx.
 export const PAYMENT_METHODS = ['UPI', 'Cash', 'Card', 'Bank transfer'];

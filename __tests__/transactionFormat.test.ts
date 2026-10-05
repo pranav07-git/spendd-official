@@ -1,5 +1,6 @@
 import {
   formatRupees,
+  formatRupeesShort,
   groupByDay,
   matchesQuery,
   signedAmount,
@@ -33,7 +34,10 @@ const tx = (overrides: Partial<Transaction>): Transaction => ({
 test('formats rupees with Indian grouping', () => {
   expect(formatRupees(1)).toBe('₹1');
   expect(formatRupees(1000)).toBe('₹1,000');
-  expect(formatRupees(123456.5)).toBe('₹1,23,456.50');
+  // DESIGN.md: no paise from ₹100 up; under ₹100 only when non-zero.
+  expect(formatRupees(123456.5)).toBe('₹1,23,457');
+  expect(formatRupees(42.5)).toBe('₹42.50');
+  expect(formatRupees(99)).toBe('₹99');
   expect(formatRupees(42209)).toBe('₹42,209');
 });
 
@@ -47,7 +51,7 @@ test('titles and subtitles', () => {
   expect(titleFor(tx({}))).toBe('Paid to Aditya Raj');
   expect(titleFor(tx({ direction: 'credit', counterparty: 'Rohit' }))).toBe('Received from Rohit');
   expect(titleFor(tx({ counterparty: null }))).toBe('Payment');
-  expect(subtitleFor(tx({}))).toBe('Navi • 7:14 PM');
+  expect(subtitleFor(tx({}))).toBe('Navi • 7:14 pm');
   expect(subtitleFor(tx({ source: null, bank: null, hasTime: false }))).toBe('UPI');
 });
 
@@ -62,7 +66,7 @@ test('groups newest first under today / yesterday / date', () => {
     ],
     now,
   );
-  expect(sections.map(s => s.title)).toEqual(['TODAY', 'YESTERDAY', '10 JUL 2026']);
+  expect(sections.map(s => s.title)).toEqual(['Today', 'Yesterday', '10 Jul 2026']);
   expect(sections[0].data.map(t => t.id)).toEqual(['today-late', 'today-early']);
 });
 
@@ -75,4 +79,11 @@ test('search matches names, handles, apps and amounts', () => {
   expect(matchesQuery(t, 'swiggy')).toBe(false);
   expect(matchesQuery(t, '  ')).toBe(true);
   expect(matchesQuery(tx({ amount: null }), '100')).toBe(false);
+});
+
+test('short amounts for tight spaces', () => {
+  expect(formatRupeesShort(1240)).toBe('₹1.2K');
+  expect(formatRupeesShort(340000)).toBe('₹3.4L');
+  expect(formatRupeesShort(12000000)).toBe('₹1.2Cr');
+  expect(formatRupeesShort(450)).toBe('₹450');
 });

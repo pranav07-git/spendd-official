@@ -1,26 +1,18 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, View, type DimensionValue } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, ScrollView, Text, View, type DimensionValue } from 'react-native';
 import { PrimaryButton } from '../components/Buttons';
-import { ProgressBars } from '../components/ProgressBars';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
-import { colors, fonts } from '../theme';
+import { makeStyles, radius, SCREEN_PADDING, SECTION_GAP, space, type, type Palette } from '../theme';
 
-const INSIGHTS: { label: string; quote: ReactNode; offset: DimensionValue }[] = [
-  {
-    label: 'DINING',
-    quote: (
-      <>
-        "You spent <Text style={{ fontFamily: fonts.serif }}>28% more</Text> on food this month."
-      </>
-    ),
-    offset: 0,
-  },
-  { label: 'GROCERIES', quote: '“Your biggest expense category is Shopping”', offset: '18%' },
-  { label: 'OPPORTUNITY', quote: '“You could save ₹4,200 based on recent patterns.”', offset: '2%' },
+const INSIGHTS: { label: string; quote: string; offset: DimensionValue; jar: keyof Palette['jar'] }[] = [
+  { label: 'Food', quote: 'You spent 28% more on food this month.', offset: 0, jar: 'peach' },
+  { label: 'Shopping', quote: 'Shopping was your biggest spend this month.', offset: '12%', jar: 'sky' },
+  { label: 'Saving', quote: 'You could save ₹4,200 based on your recent spends.', offset: '4%', jar: 'mint' },
 ];
 
 export function IntroScreen({ navigation }: ScreenProps<'Intro'>) {
+  const s = useStyles();
   const cardAnims = useRef(INSIGHTS.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
@@ -34,89 +26,64 @@ export function IntroScreen({ navigation }: ScreenProps<'Intro'>) {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ProgressBars total={2} active={0} />
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.headline}>
-          Know where{'\n'}your <Text style={styles.headlineItalic}>money</Text>
-          {'\n'}goes
+        <Text style={s.headline} accessibilityRole="header">
+          Know where your money goes
         </Text>
-        <Text style={styles.body}>
-          Spendd helps you understand your spending, subscriptions, habits, and opportunities to save.
+        <Text style={s.body}>
+          Spendd shows you where your money went, what you pay for every month, and where you could save.
         </Text>
 
-        <View style={styles.cards}>
+        <View style={s.cards}>
           {INSIGHTS.map((item, i) => (
             <Animated.View
               key={item.label}
               style={[
-                styles.card,
-                i > 0 && styles.cardOverlap,
+                s.card,
+                s[item.jar],
+                i > 0 && s.cardGap,
                 {
                   marginLeft: item.offset,
-                  zIndex: i,
                   opacity: cardAnims[i],
                   transform: [
                     { translateY: cardAnims[i].interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
                   ],
                 },
               ]}>
-              <Text style={styles.cardLabel}>{item.label}</Text>
-              <Text style={styles.cardQuote}>{item.quote}</Text>
+              <Text style={s.cardLabel}>{item.label}</Text>
+              <Text style={s.cardQuote}>{item.quote}</Text>
             </Animated.View>
           ))}
         </View>
 
-        <View style={styles.spacer} />
-        <PrimaryButton label="NEXT" withArrow onPress={() => navigation.navigate('Statement')} />
+        <View style={s.spacer} />
+        <PrimaryButton label="Next" onPress={() => navigation.navigate('Consent')} />
       </ScrollView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  content: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 24 },
-  headline: {
-    fontFamily: fonts.serif,
-    fontSize: 52,
-    lineHeight: 60,
-    color: colors.text,
-    marginTop: 40,
-    letterSpacing: -1,
-  },
-  headlineItalic: { fontFamily: fonts.serifItalic },
-  body: {
-    fontFamily: fonts.sans,
-    fontSize: 16,
-    lineHeight: 26,
-    color: colors.textMuted,
-    marginTop: 24,
-  },
-  cards: { marginTop: 36 },
+const useStyles = makeStyles(c => ({
+  content: { flexGrow: 1, paddingHorizontal: SCREEN_PADDING, paddingTop: space[6], paddingBottom: space[6] },
+  // Full-screen onboarding moment: the story style, one step larger.
+  headline: { ...type.story, fontSize: 36, lineHeight: 42, color: c.ink, marginTop: space[10] },
+  body: { ...type.body, color: c.inkMuted, marginTop: space[4] },
+  cards: { marginTop: SECTION_GAP },
   card: {
-    width: '85%',
-    backgroundColor: colors.surface,
-    paddingHorizontal: 24,
-    paddingTop: 26,
-    paddingBottom: 30,
-    // Hard offset "shadow" from the design: white edge on the right and bottom.
-    borderRightWidth: 2,
-    borderBottomWidth: 2,
-    borderColor: colors.text,
+    width: '84%',
+    borderRadius: radius.l,
+    paddingHorizontal: space[5],
+    paddingVertical: space[5],
   },
-  cardOverlap: { marginTop: -4 },
-  cardLabel: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 10,
-    letterSpacing: 2,
-    color: colors.textMuted,
-    marginBottom: 18,
-  },
-  cardQuote: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 23,
-    lineHeight: 29,
-    color: colors.text,
-  },
-  spacer: { flexGrow: 1, minHeight: 40 },
-});
+  cardGap: { marginTop: space[3] },
+  peach: { backgroundColor: c.jar.peach },
+  sky: { backgroundColor: c.jar.sky },
+  mint: { backgroundColor: c.jar.mint },
+  lilac: { backgroundColor: c.jar.lilac },
+  haldi: { backgroundColor: c.jar.haldi },
+  rose: { backgroundColor: c.jar.rose },
+  cardLabel: { ...type.label, color: c.ink, marginBottom: space[2] },
+  cardQuote: { ...type.title, color: c.ink },
+  spacer: { flexGrow: 1, minHeight: space[10] },
+}));

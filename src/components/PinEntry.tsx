@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { Animated, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Animated, Pressable, Text, Vibration, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Header } from './Header';
 import { AccountIcon, BackspaceIcon } from './Icons';
 import { Screen } from './Screen';
 import { TextButton } from './Buttons';
 import { PIN_LENGTH, USER_NAME } from '../config';
-import { colors, fonts } from '../theme';
+import { fontFamily, makeStyles, radius, space, type, useTheme } from '../theme';
 
 type PinEntryProps = {
   title: string;
@@ -36,6 +36,8 @@ export function PinEntry({
   bottomLeftKey,
   greeting = `Hi ${USER_NAME},`,
 }: PinEntryProps) {
+  const styles = useStyles();
+  const { c } = useTheme();
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -103,7 +105,7 @@ export function PinEntry({
 
       <View style={styles.identity}>
         <View style={styles.avatar}>
-          <AccountIcon size={26} />
+          <AccountIcon size={28} color={c.ink} />
         </View>
         <Text style={styles.greeting}>{greeting}</Text>
         <Text
@@ -119,10 +121,7 @@ export function PinEntry({
         {Array.from({ length: PIN_LENGTH }, (_, i) => {
           const filled = i < pin.length;
           return (
-            <View key={i} style={styles.slot}>
-              <View style={[styles.dot, filled && styles.dotFilled]} />
-              <View style={[styles.line, filled && styles.lineFilled, error && styles.lineError]} />
-            </View>
+            <View key={i} style={[styles.dot, filled && styles.dotFilled, error && styles.dotError]} />
           );
         })}
       </Animated.View>
@@ -146,7 +145,6 @@ export function PinEntry({
                   accessibilityLabel={isDelete ? 'Delete digit' : key}
                   onPress={isDelete ? pressDelete : () => pressDigit(key)}
                   onLongPress={isDelete ? clearAll : undefined}
-                  android_ripple={{ color: '#1E1E1E' }}
                   style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}>
                   {isDelete ? <BackspaceIcon /> : <Text style={styles.digit}>{key}</Text>}
                 </Pressable>
@@ -156,52 +154,41 @@ export function PinEntry({
         ))}
       </View>
 
-      <TextButton label="FORGOT PIN?" onPress={onForgot} color="#7A7A7A" style={styles.forgot} />
+      <TextButton label="Forgot PIN?" onPress={onForgot} color={c.inkMuted} style={styles.forgot} />
     </Screen>
   );
 }
 
-const KEY_BORDER = '#262626';
-
-const styles = StyleSheet.create({
-  identity: { alignItems: 'center', paddingTop: 32 },
+const useStyles = makeStyles(c => ({
+  identity: { alignItems: 'center', paddingTop: space[6], paddingHorizontal: space[5] },
   avatar: {
     width: 64,
     height: 64,
-    backgroundColor: '#2C2C2C',
-    borderWidth: 1,
-    borderColor: '#3A3A3A',
+    borderRadius: 32,
+    backgroundColor: c.jar.lilac,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: space[4],
   },
-  greeting: { fontFamily: fonts.sans, fontSize: 16, color: colors.text, marginBottom: 6 },
-  subtitle: { fontFamily: fonts.sans, fontSize: 15, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 24 },
-  error: { color: colors.danger },
-  slots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginTop: 28,
-    marginBottom: 32,
-  },
-  slot: { width: 48, alignItems: 'center' },
-  dot: { width: 10, height: 10, borderRadius: 5, marginBottom: 10, backgroundColor: 'transparent' },
-  dotFilled: { backgroundColor: colors.text },
-  line: { alignSelf: 'stretch', height: 2, backgroundColor: '#3A3A3A' },
-  lineFilled: { backgroundColor: colors.text },
-  lineError: { backgroundColor: colors.danger },
-  keypad: { flex: 1, maxHeight: 520 },
-  row: { flex: 1, flexDirection: 'row' },
+  greeting: { ...type.title, color: c.ink, marginBottom: space[1] },
+  subtitle: { ...type.body, color: c.inkMuted, textAlign: 'center' },
+  error: { color: c.low },
+  slots: { flexDirection: 'row', justifyContent: 'center', gap: space[4], marginTop: space[6], marginBottom: space[6] },
+  dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: c.inkSubtle },
+  dotFilled: { backgroundColor: c.ink, borderColor: c.ink },
+  dotError: { borderColor: c.low },
+  keypad: { flex: 1, maxHeight: 440, paddingHorizontal: space[6], gap: space[3] },
+  row: { flex: 1, flexDirection: 'row', gap: space[3] },
   key: {
     flex: 1,
+    minHeight: 56,
+    borderRadius: radius.l,
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 0.5,
-    borderColor: KEY_BORDER,
   },
-  keyBlank: { borderWidth: 0 },
-  keyPressed: { backgroundColor: '#141414' },
-  digit: { fontFamily: fonts.serif, fontSize: 24, color: colors.text },
-  forgot: { marginVertical: 6 },
-});
+  keyBlank: { backgroundColor: 'transparent' },
+  keyPressed: { backgroundColor: c.surfaceSunken, transform: [{ scale: 0.97 }] },
+  digit: { fontFamily: fontFamily.display, fontSize: 28, color: c.ink, fontVariant: ['tabular-nums'] },
+  forgot: { marginVertical: space[3] },
+}));

@@ -1,26 +1,21 @@
 import type { ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
-import { ArrowRightIcon } from './Icons';
-import { colors, fonts } from '../theme';
+import { ActivityIndicator, Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { makeStyles, radius, space, type, useTheme } from '../theme';
 
 type ButtonProps = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  /** Label left + arrow right (onboarding style) instead of a centred label. */
+  /** Kept for compatibility; DESIGN.md: no arrows on buttons. */
   withArrow?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
-export function PrimaryButton({ label, onPress, disabled, loading, withArrow, style }: ButtonProps) {
+/** Marigold, ink label, one per screen (DESIGN.md §5.1). */
+export function PrimaryButton({ label, onPress, disabled, loading, style }: ButtonProps) {
+  const s = useStyles();
+  const { c } = useTheme();
   const inactive = disabled || loading;
   return (
     <Pressable
@@ -28,38 +23,32 @@ export function PrimaryButton({ label, onPress, disabled, loading, withArrow, st
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}
       disabled={inactive}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.primary,
-        withArrow ? styles.spaced : styles.centred,
-        disabled && styles.primaryDisabled,
-        pressed && styles.pressed,
-        style,
-      ]}>
-      <Text style={[styles.primaryLabel, disabled && styles.primaryLabelDisabled]}>{label}</Text>
-      {loading ? (
-        <ActivityIndicator color={colors.background} />
-      ) : withArrow ? (
-        <ArrowRightIcon />
-      ) : null}
+      style={({ pressed }) => [s.primary, disabled && s.primaryDisabled, pressed && s.pressed, style]}>
+      {loading ? <ActivityIndicator color={c.onMarigold} /> : <Text style={[s.primaryLabel, disabled && s.labelDisabled]}>{label}</Text>}
     </Pressable>
   );
 }
 
-export function OutlineButton({ label, onPress, style }: ButtonProps) {
+/** Surface fill with an ink outline. */
+export function OutlineButton({ label, onPress, disabled, style }: ButtonProps) {
+  const s = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.outline, pressed && styles.outlinePressed, style]}>
-      <Text style={styles.outlineLabel}>{label}</Text>
+      style={({ pressed }) => [s.outline, pressed && s.pressed, disabled && s.outlineDisabled, style]}>
+      <Text style={s.outlineLabel}>{label}</Text>
     </Pressable>
   );
 }
 
+/** Quiet text action: Skip, Not now, Learn more. */
 export function TextButton({
   label,
   onPress,
-  color = colors.textMuted,
+  color,
   style,
 }: {
   label: ReactNode;
@@ -67,54 +56,47 @@ export function TextButton({
   color?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const s = useStyles();
+  const { c } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       hitSlop={12}
       onPress={onPress}
-      style={({ pressed }) => [styles.text, pressed && styles.pressed, style]}>
-      <Text style={[styles.textLabel, { color }]}>{label}</Text>
+      style={({ pressed }) => [s.quiet, pressed && s.pressed, style]}>
+      {({ pressed }) => (
+        <Text style={[s.quietLabel, { color: color ?? c.ink }, pressed && s.underline]}>{label}</Text>
+      )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(c => ({
   primary: {
-    minHeight: 64,
-    paddingHorizontal: 24,
-    backgroundColor: colors.text,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  spaced: { justifyContent: 'space-between' },
-  centred: { justifyContent: 'center' },
-  primaryDisabled: { backgroundColor: colors.disabled },
-  primaryLabel: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 14,
-    letterSpacing: 2.8,
-    color: colors.background,
-  },
-  primaryLabelDisabled: { color: colors.disabledText },
-  pressed: { opacity: 0.75 },
-  outline: {
-    minHeight: 64,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: 52,
+    borderRadius: radius.m,
+    backgroundColor: c.marigold,
+    paddingHorizontal: space[6],
     alignItems: 'center',
     justifyContent: 'center',
   },
-  outlinePressed: { backgroundColor: colors.surface },
-  outlineLabel: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 13,
-    letterSpacing: 2,
-    color: colors.text,
+  primaryDisabled: { backgroundColor: c.surfaceSunken },
+  primaryLabel: { ...type.label, fontSize: 16, color: c.onMarigold },
+  labelDisabled: { color: c.inkSubtle },
+  pressed: { transform: [{ scale: 0.97 }], opacity: 0.92 },
+  outline: {
+    minHeight: 52,
+    borderRadius: radius.m,
+    backgroundColor: c.surface,
+    borderWidth: 1.5,
+    borderColor: c.ink,
+    paddingHorizontal: space[6],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  text: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 16 },
-  textLabel: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 12,
-    letterSpacing: 2,
-  },
-});
+  outlineDisabled: { opacity: 0.4 },
+  outlineLabel: { ...type.label, fontSize: 16, color: c.ink },
+  quiet: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space[4] },
+  quietLabel: { ...type.label },
+  underline: { textDecorationLine: 'underline' },
+}));

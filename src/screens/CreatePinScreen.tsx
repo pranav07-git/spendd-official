@@ -6,7 +6,7 @@ import { isTooSimple } from '../pinRules';
 export function CreatePinScreen({ navigation }: ScreenProps<'CreatePin'>) {
   return (
     <PinEntry
-      title="ADD PIN"
+      title="Add PIN"
       subtitle="Add your 4-digit access PIN"
       onBack={navigation.goBack}
       onComplete={pin => {

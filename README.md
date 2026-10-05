@@ -1,20 +1,21 @@
 # Spendd
 
+Features and screens: [docs/FEATURES.md](docs/FEATURES.md) · Design system: [docs/DESIGN.md](docs/DESIGN.md)
+
 Agentic finance app. React Native CLI (0.87, New Architecture), Android only for now.
 
 ## Screens & flow
 
 ```
-Intro ─▶ Statement ─▶ Consent ─▶ Add PIN ─▶ Retype PIN ─▶ Setup Biometric ─▶ Home
-                                                                 ▲
-App relaunch (setup complete) ─▶ Enter PIN / biometric ──────────┘
+Intro ─▶ Consent ─▶ Add PIN ─▶ Retype PIN ─▶ Setup Biometric ─▶ Home
+                                                     ▲
+App relaunch (setup complete) ─▶ Enter PIN / biometric ┘
 ```
 
 | Screen | Behaviour |
 | --- | --- |
-| Intro | Two-step progress bar, animated insight cards, **Next**. |
-| Statement | Tap the drop zone or **Upload statement** to pick a PDF / CSV / QIF (extension is validated). **Start fresh** skips the import. |
-| Consent | **Allow & continue** is disabled until the agreement box is ticked. On allow, consent is recorded and the picked statement is copied into app-private storage. **Not now** continues without importing anything. |
+| Intro | Animated insight cards, **Next**. |
+| Consent | **Allow & continue** is disabled until the agreement box is ticked. On allow, consent is recorded. **Not now** continues without it. |
 | Add PIN | 4-digit keypad, rejects trivially guessable PINs (1111, 1234, 9876…). Long-press ⌫ clears. |
 | Retype PIN | Must match; mismatch shakes, vibrates and clears. PIN is stored in the Android Keystore (`react-native-keychain`). |
 | Setup Biometric | **Enable biometrics** creates a biometric-bound Keystore key (shows the system prompt). **Maybe later** skips. |
@@ -56,24 +57,21 @@ completed from its details screen — no shared screenshot is dropped.
 - Screenshots are deleted right after OCR; only the extracted fields (and OCR text) are kept.
 - The Transactions tab also has **Add a screenshot** for images already in the gallery.
 
-## Insights & Spendd AI (all on-device)
+## Insights & Spendd AI
 
 ```
-transactions + budget ─▶ insights/engine.ts ─▶ forecast + ~25 detectors (detectors.ts) ─▶ ranked facts
-                                                                                   │
-              optional: Spendd AI (Qwen2.5 0.5B via llama.rn) ◀── fact sheet ──────┘
-                 └─ JSON-schema-constrained output ─▶ aiPrompt.ts drops any insight whose
-                    numbers aren't in the facts ─▶ cached by facts hash ─▶ Home / Insights
+transactions + budget ─▶ insights/engine.ts ─▶ forecast + ~25 detectors (detectors.ts) ─▶ built-in insights
+          │
+          └─▶ insights/parameters.ts: 8 fixed parameters (numbers computed on the phone)
+                 └─▶ server/ (Gemini Flash-Lite, strict JSON schema) ─▶ drops any line whose numbers
+                     aren't in the facts ─▶ cached by facts hash ─▶ Home insights / My Money stories
 ```
 
-- The engine does all the maths (pace, forecast, trends, outliers, repeats, payday, savings rate…);
-  the model only rewrites and combines its facts. Without the model, the engine's insights show as-is.
-- The model (491 MB GGUF) is **not** in the APK. Users download it from **Profile → Spendd AI**
-  (Android DownloadManager, SHA-256 checked) into app storage; it's deleted on uninstall or reset.
-- llama.rn adds ~30 MB of native code per APK: `app/build.gradle` drops its rarely-used CPU variants.
-- **Windows:** llama.rn's postinstall extracts its native libs with `tar`, which fails under Git Bash.
-  Run `npm install` from PowerShell or cmd (Windows' own `tar`), or afterwards run
-  `node node_modules/llama.rn/install/download-native-artifacts.js` from PowerShell.
+- The engine does all the maths; the model only words the eight parameters. With AI insights off
+  (Profile) or the server unreachable, the engine's insights show as-is.
+- Only totals, category and merchant names are sent; never screenshots, transactions, UPI IDs or
+  the names of people paid.
+
 
 ## Prerequisites
 
@@ -132,3 +130,17 @@ npm run android      # terminal 2 – builds, installs and launches Spendd on th
 | `npm run android` | Build + install debug app on device/emulator |
 | `npm test` | Jest unit tests |
 | `npm run lint` | ESLint |
+
+## Spendd AI insights
+
+Insights on Home and the Money Stories on My Money are written by **Gemini 3.5 Flash-Lite** through
+the Spendd server in [server/](server/README.md). The phone computes eight fixed parameters from
+logged transactions ([src/insights/parameters.ts](src/insights/parameters.ts)), the server asks Gemini
+for structured output about only those, and rejects any number not in the facts. Requests are only
+made when those numbers change; answers are cached. With the server unreachable, or AI insights
+switched off in Profile, the built-in engine's insights are shown.
+
+```sh
+cd server && npm install && GEMINI_API_KEY=... npm start   # terminal 3
+adb reverse tcp:8787 tcp:8787
+```

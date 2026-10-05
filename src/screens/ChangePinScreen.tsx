@@ -27,11 +27,11 @@ export function ChangePinScreen({ navigation }: ScreenProps<'ChangePin'>) {
         return null;
       }
       const left = MAX_ATTEMPTS - attempts.current;
-      return `Incorrect PIN. ${left} ${left === 1 ? 'attempt' : 'attempts'} left.`;
+      return `That’s not your PIN. ${left} ${left === 1 ? 'attempt' : 'attempts'} left.`;
     }
     if (step === 'new') {
       if (isTooSimple(pin)) {
-        return 'That PIN is too easy to guess. Try another.';
+        return 'That PIN is easy to guess. Pick one that isn’t a sequence or a repeat.';
       }
       newPin.current = pin;
       setStep('confirm');
@@ -53,9 +53,9 @@ export function ChangePinScreen({ navigation }: ScreenProps<'ChangePin'>) {
   };
 
   const copy = {
-    current: { title: 'CURRENT PIN', subtitle: 'Enter your current 4-digit PIN' },
-    new: { title: 'NEW PIN', subtitle: 'Choose a new 4-digit PIN' },
-    confirm: { title: 'RETYPE PIN', subtitle: 'Confirm your new 4-digit PIN' },
+    current: { title: 'Current PIN', subtitle: 'Enter your current 4-digit PIN' },
+    new: { title: 'New PIN', subtitle: 'Choose a new 4-digit PIN' },
+    confirm: { title: 'Retype PIN', subtitle: 'Confirm your new 4-digit PIN' },
   }[step];
 
   return (

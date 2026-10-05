@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { emojiFor } from '../../transactions/categories';
+import { Pressable, Text, View } from 'react-native';
+import { Card } from '../../components/Layout';
 import { formatDayMonth, formatRupees, formatTime, titleFor } from '../../transactions/format';
 import { paymentCount, type CategorySpend } from '../../transactions/summary';
 import type { Transaction } from '../../transactions/types';
-import { colors, fonts } from '../../theme';
+import { jarColorFor, makeStyles, radius, space, type, useTheme } from '../../theme';
+import { CategoryGlyph } from '../../components/CategoryGlyph';
 
 function CategoryRow({
   item,
+  tint,
   expanded,
   first,
   showDates,
@@ -15,59 +17,70 @@ function CategoryRow({
   onOpen,
 }: {
   item: CategorySpend;
+  /** Jar colour for the category tile. */
+  tint: string;
   expanded: boolean;
   first: boolean;
   showDates: boolean;
   onToggle: () => void;
   onOpen: (transaction: Transaction) => void;
 }) {
+  const s = useStyles();
+  const { c } = useTheme();
   const pct = Math.round(item.share * 100);
   return (
-    <View style={!first && styles.divider}>
+    <View style={!first && s.divider}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${item.category}, ${formatRupees(item.amount)}, ${paymentCount(item.count)}, ${pct}% of the total`}
         accessibilityState={{ expanded }}
         onPress={onToggle}
-        android_ripple={{ color: '#1A1A1A' }}
-        style={styles.categoryRow}>
-        <View style={styles.categoryTop}>
-          <View style={styles.emojiTile}>
-            <Text style={styles.emoji}>{emojiFor(item.category)}</Text>
+        android_ripple={{ color: c.surfaceSunken }}
+        style={s.categoryRow}>
+        <View style={s.categoryTop}>
+          <View style={[s.emojiTile, { backgroundColor: tint }]}>
+            <CategoryGlyph category={item.category} size={20} />
           </View>
-          <View style={styles.categoryText}>
-            <Text style={styles.categoryTitle}>{item.category}</Text>
-            <Text style={styles.categoryCaption}>
-              {paymentCount(item.count).toUpperCase()} • {pct}%
+          <View style={s.categoryText}>
+            <Text style={s.categoryTitle} numberOfLines={1}>
+              {item.category}
+            </Text>
+            <Text style={s.caption}>
+              {paymentCount(item.count)} · {pct}%
             </Text>
           </View>
-          <Text style={styles.categoryAmount}>{formatRupees(item.amount)}</Text>
+          <Text style={s.amount}>{formatRupees(item.amount)}</Text>
         </View>
-        <View style={styles.track}>
-          <View style={[styles.trackFill, { width: `${Math.max(pct, 2)}%` }]} />
+        <View style={s.track}>
+          <View style={[s.trackFill, { width: `${Math.max(pct, 2)}%` }]} />
         </View>
       </Pressable>
 
       {expanded
-        ? item.transactions.map(tx => (
+        ? item.transactions.map((tx, i) => (
             <Pressable
               key={tx.id}
               accessibilityRole="button"
               accessibilityLabel={`${titleFor(tx)}, ${formatRupees(tx.amount!)}`}
               onPress={() => onOpen(tx)}
-              style={({ pressed }) => [styles.txRow, pressed && styles.txRowPressed]}>
-              <View style={styles.txText}>
-                <Text style={styles.txTitle} numberOfLines={1}>
+              style={({ pressed }) => [
+                s.txRow,
+                i === 0 && s.txFirst,
+                i === item.transactions.length - 1 && s.txLast,
+                i > 0 && s.txDivider,
+                pressed && s.txRowPressed,
+              ]}>
+              <View style={s.txText}>
+                <Text style={s.txTitle} numberOfLines={1}>
                   {titleFor(tx)}
                 </Text>
-                <Text style={styles.txMeta} numberOfLines={1}>
+                <Text style={s.caption} numberOfLines={1}>
                   {[tx.source, showDates ? formatDayMonth(tx.occurredAt) : null, tx.hasTime ? formatTime(tx.occurredAt) : null]
                     .filter(Boolean)
-                    .join(' • ')
-                    .toUpperCase()}
+                    .join(' · ')}
                 </Text>
               </View>
-              <Text style={styles.txAmount}>-{formatRupees(tx.amount!)}</Text>
+              <Text style={s.amount}>-{formatRupees(tx.amount!)}</Text>
             </Pressable>
           ))
         : null}
@@ -87,12 +100,14 @@ export function CategoryBreakdown({
   onOpen: (transaction: Transaction) => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { c } = useTheme();
   return (
-    <View style={styles.card}>
+    <Card padded={false}>
       {categories.map((item, i) => (
         <CategoryRow
           key={item.category}
           item={item}
+          tint={jarColorFor(item.category, c)}
           first={i === 0}
           showDates={showDates}
           expanded={expanded === item.category}
@@ -100,47 +115,46 @@ export function CategoryBreakdown({
           onOpen={onOpen}
         />
       ))}
-    </View>
+    </Card>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  divider: { borderTopWidth: 1, borderTopColor: colors.divider },
-  categoryRow: { paddingHorizontal: 16, paddingVertical: 18 },
+const useStyles = makeStyles(c => ({
+  divider: { borderTopWidth: 1, borderTopColor: c.line },
+  categoryRow: { padding: space[4] },
   categoryTop: { flexDirection: 'row', alignItems: 'center' },
   emojiTile: {
     width: 40,
     height: 40,
-    backgroundColor: '#262626',
+    borderRadius: radius.s + 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emoji: { fontSize: 18 },
-  categoryText: { flex: 1, marginLeft: 16, marginRight: 8 },
-  categoryTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.ink },
-  categoryCaption: { fontFamily: fonts.sans, fontSize: 11.5, letterSpacing: 0.4, color: colors.inkMuted, marginTop: 2 },
-  categoryAmount: { fontFamily: fonts.sansSemiBold, fontSize: 18, color: colors.ink },
-  track: { height: 6, backgroundColor: colors.track, marginTop: 14, overflow: 'hidden' },
-  trackFill: { height: '100%', backgroundColor: colors.ink },
+  categoryText: { flex: 1, marginLeft: space[3], marginRight: space[2] },
+  categoryTitle: { ...type.bodyStrong, color: c.ink },
+  caption: { ...type.caption, color: c.inkMuted },
+  amount: { ...type.amount, color: c.ink },
+  track: {
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: c.surfaceSunken,
+    marginTop: space[3],
+    overflow: 'hidden',
+  },
+  trackFill: { height: '100%', borderRadius: radius.pill, backgroundColor: c.inkMuted },
   txRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: '#151515',
+    minHeight: 56,
+    marginHorizontal: space[4],
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    backgroundColor: c.surfaceSunken,
   },
-  txRowPressed: { backgroundColor: '#1B1B1B' },
-  txText: { flex: 1, marginRight: 8 },
-  txTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.ink },
-  txMeta: { fontFamily: fonts.sans, fontSize: 11, color: colors.inkMuted, marginTop: 2 },
-  txAmount: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.ink },
-});
+  txFirst: { borderTopLeftRadius: radius.m, borderTopRightRadius: radius.m },
+  txLast: { borderBottomLeftRadius: radius.m, borderBottomRightRadius: radius.m, marginBottom: space[4] },
+  txDivider: { borderTopWidth: 1, borderTopColor: c.line },
+  txRowPressed: { backgroundColor: c.line },
+  txText: { flex: 1, marginRight: space[2] },
+  txTitle: { ...type.label, color: c.ink },
+}));

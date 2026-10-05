@@ -2,11 +2,26 @@ import type { Transaction } from './types';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/**
+ * ₹1,23,456 — Indian grouping. No paise from ₹100 up; below that, paise only when non-zero
+ * (₹42.50). DESIGN.md §4.4.
+ */
 export function formatRupees(amount: number): string {
-  const [whole, fraction] = Math.abs(amount).toFixed(2).split('.');
+  const abs = Math.abs(amount);
+  const [whole, fraction] = (abs >= 100 ? Math.round(abs).toFixed(0) : abs.toFixed(2)).split('.');
   // Indian grouping: last three digits, then pairs (1,23,45,678).
   const grouped = whole.replace(/(\d)(?=(\d{2})+\d$)/g, '$1,');
-  return `₹${grouped}${fraction === '00' ? '' : `.${fraction}`}`;
+  return `₹${grouped}${!fraction || fraction === '00' ? '' : `.${fraction}`}`;
+}
+
+/** ₹1.2K, ₹3.4L, ₹1.2Cr — for tight spaces. */
+export function formatRupeesShort(amount: number): string {
+  const abs = Math.abs(amount);
+  const one = (n: number) => (Math.round(n * 10) / 10).toString().replace(/\.0$/, '');
+  if (abs >= 1e7) return `₹${one(abs / 1e7)}Cr`;
+  if (abs >= 1e5) return `₹${one(abs / 1e5)}L`;
+  if (abs >= 1e3) return `₹${one(abs / 1e3)}K`;
+  return formatRupees(abs);
 }
 
 export function signedAmount(tx: Transaction): string {
@@ -20,7 +35,7 @@ export function formatTime(timestamp: number): string {
   const d = new Date(timestamp);
   const hours = d.getHours();
   const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${hours % 12 || 12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`;
+  return `${hours % 12 || 12}:${minutes} ${hours < 12 ? 'am' : 'pm'}`;
 }
 
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -58,7 +73,7 @@ export function initialFor(tx: Transaction): string {
   return (name?.trim().charAt(0) || '₹').toUpperCase();
 }
 
-/** "GOOGLE PAY • 11:30 PM" — where it was paid from, and when. */
+/** "Google Pay • 11:30 pm" — where it was paid from, and when. */
 export function subtitleFor(tx: Transaction): string {
   const where = tx.source ?? tx.bank ?? 'UPI';
   return tx.hasTime ? `${where} • ${formatTime(tx.occurredAt)}` : where;
@@ -96,7 +111,7 @@ export const daysBetween = (from: number, to: number) => Math.round((to - from) 
 
 export type DaySection = { title: string; data: Transaction[] };
 
-/** Newest first, grouped under TODAY / YESTERDAY / "12 JUL 2026". */
+/** Newest first, grouped under "Today" / "Yesterday" / "12 Jul 2026" (DESIGN.md §4.4). */
 export function groupByDay(transactions: Transaction[], now: number = Date.now()): DaySection[] {
   const today = startOfDay(now);
   const yesterday = startOfDay(today - 1);
@@ -112,10 +127,10 @@ export function groupByDay(transactions: Transaction[], now: number = Date.now()
   return [...sections.entries()].map(([day, data]) => ({
     title:
       day === today
-        ? 'TODAY'
+        ? 'Today'
         : day === yesterday
-          ? 'YESTERDAY'
-          : formatDate(day).replace(',', '').toUpperCase(),
+          ? 'Yesterday'
+          : formatDate(day).replace(',', ''),
     data,
   }));
 }

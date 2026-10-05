@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
 import { PrimaryButton, TextButton } from '../components/Buttons';
+import { Chips } from '../components/Chips';
 import { DayStepper } from '../components/DayStepper';
-import { ChevronLeftIcon } from '../components/Icons';
+import { Header } from '../components/Header';
+import { Card } from '../components/Layout';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
 import { getBudget, removeBudget, saveBudget } from '../storage/appState';
 import { periodFor, type Budget, type BudgetPeriodKind } from '../transactions/budget';
 import { addDays, startOfDay } from '../transactions/format';
-import { colors, fonts } from '../theme';
+import { makeStyles, SCREEN_PADDING, SECTION_GAP, space, TOUCH_TARGET, type, useTheme } from '../theme';
 
 const PERIODS: { key: BudgetPeriodKind; label: string; hint: string }[] = [
-  { key: 'month', label: 'MONTHLY', hint: 'Resets on the 1st of every month.' },
-  { key: 'week', label: 'WEEKLY', hint: 'Resets every Monday.' },
-  { key: 'custom', label: 'CUSTOM DATES', hint: 'For a trip, a festival, or any stretch of days.' },
+  { key: 'month', label: 'Monthly', hint: 'Resets on the 1st of every month.' },
+  { key: 'week', label: 'Weekly', hint: 'Resets every Monday.' },
+  { key: 'custom', label: 'Custom dates', hint: 'For a trip, a festival, or any stretch of days.' },
 ];
 
 export function SetBudgetScreen({ navigation }: ScreenProps<'SetBudget'>) {
+  const s = useStyles();
+  const { c } = useTheme();
   const today = startOfDay(Date.now());
   const [existing, setExisting] = useState<Budget | null>(null);
   const [amount, setAmount] = useState('');
@@ -52,7 +56,7 @@ export function SetBudgetScreen({ navigation }: ScreenProps<'SetBudget'>) {
   const save = async () => {
     const value = Number(amount.replace(/[₹,\s]/g, ''));
     if (!Number.isFinite(value) || value <= 0) {
-      setError('Enter how much you want to spend.');
+      setError('Add how much you want to spend to set a budget.');
       return;
     }
     setError(null);
@@ -65,7 +69,7 @@ export function SetBudgetScreen({ navigation }: ScreenProps<'SetBudget'>) {
       });
       navigation.goBack();
     } catch {
-      setError('Couldn’t save. Try again.');
+      setError('Couldn’t save your budget. Try again.');
       setSaving(false);
     }
   };
@@ -87,124 +91,77 @@ export function SetBudgetScreen({ navigation }: ScreenProps<'SetBudget'>) {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={navigation.goBack}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <ChevronLeftIcon size={20} color={colors.ink} strokeWidth={2.2} />
-        </Pressable>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          {existing ? 'Edit Budget' : 'Set a Budget'}
-        </Text>
-      </View>
+      <Header title={existing ? 'Edit budget' : 'Set a budget'} onBack={navigation.goBack} />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={styles.prompt}>How much do you want to spend?</Text>
-        <View style={styles.amountRow}>
-          <Text style={[styles.amountText, !amount && styles.amountPlaceholder]}>₹</Text>
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Text style={s.prompt} accessibilityRole="header">
+          How much do you want to spend?
+        </Text>
+        <View style={s.amountRow}>
+          <Text style={[s.amountText, !amount && s.amountPlaceholder]}>₹</Text>
           <TextInput
             value={amount}
             onChangeText={setAmount}
             keyboardType="number-pad"
             placeholder="0"
-            placeholderTextColor={colors.inkFaint}
-            style={[styles.amountText, styles.amountInput]}
+            placeholderTextColor={c.inkSubtle}
+            style={[s.amountText, s.amountInput]}
             autoFocus={!existing}
             accessibilityLabel="Budget amount"
           />
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>BUDGET FOR</Text>
-          <View style={styles.periods}>
-            {PERIODS.map(p => (
-              <Pressable
-                key={p.key}
-                accessibilityRole="button"
-                accessibilityState={{ selected: period === p.key }}
-                onPress={() => setPeriod(p.key)}
-                style={[styles.periodOption, period === p.key && styles.periodActive]}>
-                <Text style={[styles.periodLabel, period === p.key && styles.periodLabelActive]}>{p.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.hint}>{PERIODS.find(p => p.key === period)!.hint}</Text>
-        </View>
+        <Card style={s.card}>
+          <Text style={s.label}>Budget for</Text>
+          <Chips
+            options={PERIODS.map(p => p.label)}
+            selected={PERIODS.find(p => p.key === period)!.label}
+            onSelect={label => setPeriod(PERIODS.find(p => p.label === label)!.key)}
+          />
+          <Text style={s.hint}>{PERIODS.find(p => p.key === period)!.hint}</Text>
+        </Card>
 
         {period === 'custom' ? (
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.label}>FROM</Text>
+          <Card style={s.card}>
+            <View style={s.row}>
+              <Text style={s.label}>From</Text>
               <DayStepper value={start} onChange={changeStart} accessibilityLabel="Start date" />
             </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>TO</Text>
+            <View style={s.row}>
+              <Text style={s.label}>To</Text>
               <DayStepper value={end} onChange={setEnd} min={start} accessibilityLabel="End date" />
             </View>
-            <Text style={styles.hint}>
+            <Text style={s.hint}>
               {days} {days === 1 ? 'day' : 'days'}
             </Text>
-          </View>
+          </Card>
         ) : null}
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <PrimaryButton label="SAVE BUDGET" onPress={save} loading={saving} style={styles.save} />
-        {existing ? <TextButton label="REMOVE BUDGET" color={colors.danger} onPress={confirmRemove} style={styles.remove} /> : null}
+        {error ? <Text style={s.error}>{error}</Text> : null}
+        <PrimaryButton label={existing ? 'Save budget' : 'Set budget'} onPress={save} loading={saving} style={s.save} />
+        {existing ? <TextButton label="Remove budget" color={c.low} onPress={confirmRemove} style={s.remove} /> : null}
       </ScrollView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  pressed: { opacity: 0.6 },
-  header: { height: 72, justifyContent: 'center', alignItems: 'center' },
-  back: {
-    position: 'absolute',
-    left: 24,
-    width: 40,
-    height: 40,
-    backgroundColor: '#2A2A2A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: colors.ink },
-  content: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 32 },
-  prompt: { fontFamily: fonts.serifItalic, fontSize: 19, color: colors.inkMuted, textAlign: 'center' },
+const useStyles = makeStyles(c => ({
+  content: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: SECTION_GAP },
+  prompt: { ...type.story, color: c.ink },
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 36,
+    marginTop: space[4],
+    marginBottom: SECTION_GAP,
   },
-  amountText: { fontFamily: fonts.serifBold, fontSize: 48, color: colors.ink },
-  amountPlaceholder: { color: colors.inkFaint },
-  amountInput: { minWidth: 40, paddingVertical: 0, marginLeft: 6 },
-  card: {
-    backgroundColor: '#1C1C1C',
-    borderRadius: 22,
-    paddingHorizontal: 24,
-    paddingVertical: 22,
-    gap: 16,
-    marginBottom: 16,
-  },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 24, gap: 16 },
-  label: { fontFamily: fonts.sansMedium, fontSize: 11, letterSpacing: 2.2, color: colors.inkMuted },
-  periods: { gap: 8 },
-  periodOption: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  periodActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  periodLabel: { fontFamily: fonts.sansSemiBold, fontSize: 11, letterSpacing: 1.5, color: colors.inkMuted },
-  periodLabelActive: { color: colors.background },
-  hint: { fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.inkMuted },
-  error: { fontFamily: fonts.sans, fontSize: 13, color: colors.danger, textAlign: 'center', marginTop: 4 },
-  save: { marginTop: 16 },
-  remove: { marginTop: 12 },
-});
+  amountText: { ...type.amountHero, color: c.ink },
+  amountPlaceholder: { color: c.inkSubtle },
+  amountInput: { minWidth: 40, paddingVertical: 0, marginLeft: space[1] },
+  card: { gap: space[3], marginBottom: space[3] },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TOUCH_TARGET, gap: space[4] },
+  label: { ...type.label, color: c.inkMuted },
+  hint: { ...type.caption, color: c.inkMuted },
+  error: { ...type.caption, color: c.low, textAlign: 'center', marginTop: space[1] },
+  save: { marginTop: space[6] },
+  remove: { marginTop: space[3] },
+}));

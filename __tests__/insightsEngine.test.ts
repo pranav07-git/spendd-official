@@ -91,6 +91,15 @@ describe('daily status', () => {
     expect(report.dailyStatus.spendBelowToday).toBe(250);
     expect(report.dailyBudget?.basis).toBe('usual');
   });
+
+  it('averages the usual day over the days actually logged, not since an old screenshot', () => {
+    // Logging began 4 days ago (₹300/day since), plus one old screenshot from June.
+    const loggedFrom = day(2026, 10, 6);
+    const recent = steady(300, 4).map(t => ({ ...t, createdAt: loggedFrom }));
+    const old = tx({ amount: 6000, occurredAt: at(2026, 6, 17), createdAt: loggedFrom });
+    const report = buildInsights([...recent, old], null, NOW);
+    expect(report.dailyBudget).toMatchObject({ amount: 300, basis: 'usual' });
+  });
 });
 
 describe('patterns', () => {
@@ -146,4 +155,18 @@ describe('patterns', () => {
 it('summarises lifetime stats', () => {
   const stats = lifetimeStats([...steady(100, 3), tx({ direction: 'credit', category: 'Salary', amount: 5000 })], NOW);
   expect(stats).toMatchObject({ totalSpent: 300, transactions: 4, topCategory: 'Food', daysTracked: 4 });
+});
+
+describe('headlineFor', () => {
+  const { headlineFor } = require('../src/insights/engine');
+  const f = (o: object) => ({ label: 'October', lastDay: 0, spent: 0, projected: 0, low: 0, high: 0, pace: 0, budget: null, overrunOn: null, daysLeft: 9, confident: true, ...o });
+  it('tells the budget story first', () => {
+    expect(headlineFor(f({ budget: 10000, spent: 5800, projected: 9000 }), null, true)).toBe('₹4,200 left for 9 days. You’re on track.');
+    expect(headlineFor(f({ budget: 10000, spent: 5800, projected: 12000 }), null, true)).toBe('₹4,200 left for 9 days. Things are a bit tight.');
+    expect(headlineFor(f({ budget: 10000, spent: 10340, daysLeft: 1 }), null, true)).toBe("₹340 over budget, with 1 day to go. Let's slow down a bit.");
+  });
+  it('falls back to the week, then a neutral line', () => {
+    expect(headlineFor(f({}), -12, true)).toBe('You’re spending less than usual this week.');
+    expect(headlineFor(f({}), null, false)).toBe('No spends yet. Share your next UPI screenshot to start.');
+  });
 });

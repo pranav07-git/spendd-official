@@ -1,125 +1,190 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  PanResponder,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-  type PanResponderGestureState,
-} from 'react-native';
-import { PrimaryButton } from '../components/Buttons';
-import { ArrowDownIcon, ArrowUpIcon, CrossIcon } from '../components/Icons';
+import { Animated, Easing, PanResponder, Pressable, Text, useWindowDimensions, View, type PanResponderGestureState } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { OutlineButton, PrimaryButton, TextButton } from '../components/Buttons';
+import { CategoryGlyph } from '../components/CategoryGlyph';
+import { CrossIcon } from '../components/Icons';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
-import { emojiFor } from '../transactions/categories';
-import { formatDayMonth, formatRupees, formatTime, titleFor } from '../transactions/format';
-import { listTransactions } from '../transactions/store';
-import { todaysStory, type StorySlide } from '../transactions/stories';
-import { paymentCount } from '../transactions/summary';
-import { colors, fonts } from '../theme';
+import { kindFor } from '../transactions/categories';
+import { addDays, formatDayMonth, formatRupees, formatTime, startOfDay } from '../transactions/format';
+import { listTransactions, updateTransaction } from '../transactions/store';
+import { categoryLine, monthlyStory, type StorySlide } from '../transactions/stories';
+import type { Transaction } from '../transactions/types';
+import { elevation, makeStyles, radius, SCREEN_PADDING, space, TOUCH_TARGET, type, useTheme } from '../theme';
 import { FadeIn } from './home/HomeSections';
 
-const SLIDE_MS = 5000;
-const MAX_ROWS = 4;
+const SLIDE_MS = 6000;
 
-function More({ hidden }: { hidden: number }) {
-  return hidden > 0 ? <Text style={styles.more}>+{hidden} MORE</Text> : null;
+/** "Today at 10:52 am to Ravi" */
+function whenAndWho(tx: Transaction): string {
+  const day = startOfDay(tx.occurredAt);
+  const today = startOfDay(Date.now());
+  const date = day === today ? 'Today' : day === addDays(today, -1) ? 'Yesterday' : formatDayMonth(tx.occurredAt);
+  const time = tx.hasTime ? ` at ${formatTime(tx.occurredAt)}` : '';
+  const who = tx.counterparty ? ` to ${tx.counterparty}` : '';
+  return `${date}${time}${who}`;
 }
 
-function SlideContent({ slide }: { slide: StorySlide }) {
+const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** The top half of each slide: what the story is about, and the big number. */
+function Headline({ slide }: { slide: StorySlide }) {
+  const s = useStyles();
   if (slide.kind === 'empty') {
     return (
-      <>
-        <View style={styles.emojiTile}>
-          <Text style={styles.emojiLarge}>🌱</Text>
-        </View>
-        <Text style={styles.heading}>Nothing spent yet</Text>
-        <Text style={styles.body}>
-          Your story fills up as you pay. Share a payment screenshot to Spendd or add a transaction by hand.
+      <View style={s.centre}>
+        <Text style={s.eyebrow}>This month</Text>
+        <Text style={s.storyWord}>Nothing yet</Text>
+        <Text style={[s.body, s.bodyGap]}>
+          Your story fills up as you pay. Share a payment screenshot to Spendd or add a spend by hand.
         </Text>
-      </>
+      </View>
     );
   }
+  if (slide.kind === 'category') {
+    return (
+      <View style={s.centre}>
+        <View style={s.glyphCircle}>
+          <CategoryGlyph category={slide.category} size={28} />
+        </View>
+        <Text style={s.eyebrow}>This month</Text>
+        <Text style={s.storyWord}>{slide.category}</Text>
+        <Text style={[s.body, s.bodyGap]}>You've spent</Text>
+        <Text style={s.hero} adjustsFontSizeToFit numberOfLines={1}>
+          {formatRupees(slide.amount)}
+        </Text>
+      </View>
+    );
+  }
+  if (slide.kind === 'income') {
+    return (
+      <View style={s.centre}>
+        <View style={[s.glyphCircle, s.glyphIncome]}>
+          <CategoryGlyph category="Income" size={28} />
+        </View>
+        <Text style={s.eyebrow}>This month</Text>
+        <Text style={s.storyWord}>Income</Text>
+        <Text style={[s.body, s.bodyGap]}>You earned</Text>
+        <Text style={[s.hero, s.heroIncome]} adjustsFontSizeToFit numberOfLines={1}>
+          {formatRupees(slide.total)}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View style={s.centre}>
+      <Text style={s.eyebrow}>A few to sort</Text>
+      <Text style={s.storyWord}>What was this payment for?</Text>
+      <Text style={[s.hero, s.bodyGap]} adjustsFontSizeToFit numberOfLines={1}>
+        {formatRupees(slide.tx.amount)}
+      </Text>
+      <Text style={s.meta}>{whenAndWho(slide.tx)}</Text>
+    </View>
+  );
+}
 
-  if (slide.kind === 'total') {
-    const { summary, change } = slide;
-    const Arrow = change !== null && change > 0 ? ArrowUpIcon : ArrowDownIcon;
+type FactsProps = {
+  slide: StorySlide;
+  answer: string | undefined;
+  error: boolean;
+  onDetails: (query: string) => void;
+  onOpenTransaction: (tx: Transaction) => void;
+  onAnswer: (tx: Transaction, category: string) => void;
+  onAdd: () => void;
+};
+
+/** The bottom of the card: a fact and an action. Outside the swipe area so taps reach it. */
+function Facts({ slide, answer, error, onDetails, onOpenTransaction, onAnswer, onAdd }: FactsProps) {
+  const s = useStyles();
+  if (slide.kind === 'empty') {
+    return <PrimaryButton label="Add a spend" onPress={onAdd} />;
+  }
+
+  if (slide.kind === 'category') {
     return (
       <>
-        <Text style={styles.eyebrow}>SPENT TODAY</Text>
-        <Text style={styles.hero} adjustsFontSizeToFit numberOfLines={1}>
-          {formatRupees(summary.total)}
-        </Text>
-        <Text style={styles.heroCaption}>across {paymentCount(summary.count)}</Text>
-        {change !== null ? (
-          <View style={styles.changeRow}>
-            <Arrow size={13} color={colors.ink} strokeWidth={2} />
-            <Text style={styles.changeLabel}>
-              {Math.abs(change)}% {change > 0 ? 'MORE' : 'LESS'} THAN YOUR DAILY AVERAGE
-            </Text>
+        <View style={s.facts}>
+          <Text style={s.factLine}>{capitalise(categoryLine(slide.category, slide.count, slide.period))}.</Text>
+          <View style={s.factBottom}>
+            <View>
+              <Text style={s.caption}>Total</Text>
+              <Text style={s.factAmount}>{formatRupees(slide.total)}</Text>
+            </View>
+            <OutlineButton
+              label="Details"
+              onPress={() => onDetails(slide.category)}
+              style={s.smallButton}
+            />
+          </View>
+        </View>
+        {slide.of > 1 ? (
+          <View style={s.dots} accessibilityLabel={`Category ${slide.position + 1} of ${slide.of}`}>
+            {Array.from({ length: slide.of }, (_, i) => (
+              <View key={i} style={[s.dot, i === slide.position && s.dotActive]} />
+            ))}
           </View>
         ) : null}
-
-        <View style={styles.list}>
-          {summary.categories.slice(0, MAX_ROWS).map(c => (
-            <View key={c.category} style={styles.shareRow}>
-              <View style={styles.shareTop}>
-                <Text style={styles.rowTitle}>
-                  {emojiFor(c.category)}  {c.category}
-                </Text>
-                <Text style={styles.rowAmount}>{formatRupees(c.amount)}</Text>
-              </View>
-              <View style={styles.track}>
-                <View style={[styles.trackFill, { width: `${Math.max(Math.round(c.share * 100), 2)}%` }]} />
-              </View>
-            </View>
-          ))}
-          <More hidden={summary.categories.length - MAX_ROWS} />
-        </View>
       </>
     );
   }
 
-  const { item } = slide;
-  return (
-    <>
-      <View style={styles.emojiTile}>
-        <Text style={styles.emojiLarge}>{emojiFor(item.category)}</Text>
-      </View>
-      <Text style={styles.eyebrow}>TODAY ON</Text>
-      <Text style={styles.heading}>{item.category}</Text>
-      <Text style={styles.hero} adjustsFontSizeToFit numberOfLines={1}>
-        {formatRupees(item.amount)}
-      </Text>
-      <Text style={styles.changeLabel}>
-        {Math.round(item.share * 100)}% OF TODAY’S SPENDING • {paymentCount(item.count).toUpperCase()}
-      </Text>
-
-      <View style={styles.list}>
-        {item.transactions.slice(0, MAX_ROWS).map(tx => (
-          <View key={tx.id} style={styles.txRow}>
-            <View style={styles.txText}>
-              <Text style={styles.rowTitle} numberOfLines={1}>
-                {titleFor(tx)}
-              </Text>
-              <Text style={styles.txMeta} numberOfLines={1}>
-                {[tx.source, tx.hasTime ? formatTime(tx.occurredAt) : null].filter(Boolean).join(' • ').toUpperCase()}
-              </Text>
-            </View>
-            <Text style={styles.rowAmount}>-{formatRupees(tx.amount!)}</Text>
+  if (slide.kind === 'income') {
+    return (
+      <View style={[s.facts, s.factsIncome]}>
+        <Text style={s.factLine}>Your biggest income is from</Text>
+        <View style={s.incomeRow}>
+          <View style={s.incomeIcon}>
+            <CategoryGlyph category={slide.top.category === 'Salary' ? 'Salary' : 'Income'} size={22} />
           </View>
-        ))}
-        <More hidden={item.transactions.length - MAX_ROWS} />
+          <View style={s.incomeText}>
+            <Text style={s.incomeSource} numberOfLines={1}>
+              {slide.top.label}
+            </Text>
+            <Text style={s.incomeAmount}>{formatRupees(slide.top.amount)}</Text>
+          </View>
+        </View>
+        <OutlineButton
+          label="View details"
+          onPress={() => onDetails(slide.top.category === 'Personal' ? slide.top.label : slide.top.category)}
+          style={s.fullButton}
+        />
       </View>
-    </>
+    );
+  }
+
+  return (
+    <View style={s.questionArea}>
+      {answer ? (
+        <View style={[s.choice, s.choiceSelected, s.answered]} accessibilityLiveRegion="polite">
+          <CategoryGlyph category={answer} size={18} />
+          <Text style={s.choiceLabel}>{answer === 'Personal' ? 'Kept as personal. Thanks.' : `Marked as ${answer.toLowerCase()}. Thanks.`}</Text>
+        </View>
+      ) : (
+        <View style={s.choices}>
+          {slide.suggestions.map(category => (
+            <Pressable
+              key={category}
+              accessibilityRole="button"
+              accessibilityLabel={`It was ${category}`}
+              onPress={() => onAnswer(slide.tx, category)}
+              style={({ pressed }) => [s.choice, pressed && s.choiceSelected]}>
+              <CategoryGlyph category={category} size={18} />
+              <Text style={s.choiceLabel}>{category}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      {error ? <Text style={s.error}>Couldn’t save that. Try again.</Text> : null}
+      {answer ? null : <TextButton label="It was personal" onPress={() => onAnswer(slide.tx, 'Personal')} />}
+      <TextButton label="View transaction details" onPress={() => onOpenTransaction(slide.tx)} />
+    </View>
   );
 }
 
 /** One segment of the progress row: full when seen, filling for the current slide. */
 function StoryBar({ state }: { state: 'seen' | 'unseen' | Animated.Value }) {
+  const s = useStyles();
   const width =
     state === 'seen'
       ? '100%'
@@ -127,19 +192,24 @@ function StoryBar({ state }: { state: 'seen' | 'unseen' | Animated.Value }) {
         ? '0%'
         : state.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   return (
-    <View style={styles.barTrack}>
-      <Animated.View style={[styles.barFill, { width }]} />
+    <View style={s.barTrack}>
+      <Animated.View style={[s.barFill, { width }]} />
     </View>
   );
 }
 
 /**
- * Full-screen, Instagram-style viewer for Today's Story. Slides auto-advance; tap the left or right
- * side (or swipe) to move, hold to pause, swipe down to close.
+ * Full-screen story for the month: top categories, income, then payments to place. Slides
+ * auto-advance (a question waits for an answer); tap the left or right of the top half (or
+ * swipe) to move, hold to pause, swipe down to close.
  */
 export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
+  const s = useStyles();
+  const { c } = useTheme();
   const [slides, setSlides] = useState<StorySlide[] | null>(null);
   const [index, setIndex] = useState(route.params.startIndex);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [failed, setFailed] = useState<string | null>(null);
   const progress = useRef(new Animated.Value(0)).current;
   const { width } = useWindowDimensions();
   const closed = useRef(false);
@@ -148,11 +218,13 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
   useEffect(() => {
     listTransactions()
       .catch(() => [])
-      .then(transactions => setSlides(todaysStory(transactions)));
+      .then(transactions => setSlides(monthlyStory(transactions)));
   }, []);
 
   const count = slides?.length ?? 0;
   const current = Math.min(index, Math.max(count - 1, 0));
+  const slide = slides?.[current];
+  const waiting = slide?.kind === 'question' && !answers[slide.tx.id];
 
   const close = useCallback(() => {
     if (!closed.current) {
@@ -166,6 +238,9 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
 
   const resume = useCallback(() => {
     progress.stopAnimation(value => {
+      if (waiting) {
+        return; // a question stays until it's answered or skipped
+      }
       Animated.timing(progress, {
         toValue: 1,
         duration: SLIDE_MS * (1 - value),
@@ -173,7 +248,7 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
         useNativeDriver: false,
       }).start(({ finished }) => finished && actions.current.go(1));
     });
-  }, [progress]);
+  }, [progress, waiting]);
 
   const go = useCallback(
     (delta: number) => {
@@ -199,9 +274,17 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
       return;
     }
     progress.setValue(0);
-    resume();
+    actions.current.resume();
     return () => progress.stopAnimation();
-  }, [current, slides, progress, resume]);
+  }, [current, slides, progress]);
+
+  // Pause while a transaction is open on top of the story.
+  useFocusEffect(
+    useCallback(() => {
+      actions.current.resume();
+      return () => progress.stopAnimation();
+    }, [progress]),
+  );
 
   const onRelease = useCallback(
     (g: PanResponderGestureState) => {
@@ -234,107 +317,149 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
     [onRelease, progress],
   );
 
-  const slide = slides?.[current];
+  const answer = async (tx: Transaction, category: string) => {
+    setFailed(null);
+    try {
+      await updateTransaction(tx.id, { category, kind: kindFor(category), categoryConfirmed: true });
+      setAnswers(a => ({ ...a, [tx.id]: category }));
+      setTimeout(() => actions.current.go(1), 900);
+    } catch {
+      setFailed(tx.id);
+    }
+  };
 
   return (
     <Screen>
-      <View style={styles.bars}>
+      <View style={s.bars}>
         {(slides ?? []).map((_, i) => (
           <StoryBar key={i} state={i < current ? 'seen' : i === current ? progress : 'unseen'} />
         ))}
       </View>
-
-      <View style={styles.topRow}>
-        <View style={styles.badgeSquare} />
-        <Text style={styles.storyName}>Today’s Story</Text>
-        <Text style={styles.storyDate}>{formatDayMonth(Date.now()).toUpperCase()}</Text>
+      <View style={s.topRow}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close story"
-          hitSlop={14}
           onPress={close}
-          style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-          <CrossIcon size={18} color={colors.ink} />
+          style={({ pressed }) => [s.close, pressed && s.pressed]}>
+          <CrossIcon size={18} color={c.inkMuted} />
         </Pressable>
       </View>
 
-      <View
-        style={styles.stage}
-        {...pan.panHandlers}
-        accessible
-        accessibilityRole="adjustable"
-        accessibilityLabel={slides ? `Story ${current + 1} of ${count}` : 'Loading story'}
-        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-        onAccessibilityAction={e => go(e.nativeEvent.actionName === 'increment' ? 1 : -1)}>
-        {slide ? (
-          <FadeIn key={current} index={0}>
-            <SlideContent slide={slide} />
-          </FadeIn>
-        ) : null}
-      </View>
+      <View style={s.storyCard}>
+        <View
+          style={s.stage}
+          {...pan.panHandlers}
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel={slides ? `Story ${current + 1} of ${count}` : 'Loading story'}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={e => go(e.nativeEvent.actionName === 'increment' ? 1 : -1)}>
+          {slide ? (
+            <FadeIn key={current} index={0}>
+              <Headline slide={slide} />
+            </FadeIn>
+          ) : null}
+        </View>
 
-      {slide?.kind === 'empty' ? (
-        <PrimaryButton
-          label="ADD A TRANSACTION"
-          withArrow
-          onPress={() => navigation.replace('AddTransaction')}
-          style={styles.cta}
-        />
-      ) : (
-        <Text style={styles.hint}>TAP TO CONTINUE • SWIPE DOWN TO CLOSE</Text>
-      )}
+        <View style={s.cardArea}>
+          {slide ? (
+            <FadeIn key={`card-${current}`} index={1}>
+              <Facts
+                slide={slide}
+                answer={slide.kind === 'question' ? answers[slide.tx.id] : undefined}
+                error={slide.kind === 'question' && failed === slide.tx.id}
+                onDetails={query => navigation.navigate('Home', { tab: 'transactions', query })}
+                onOpenTransaction={transaction => navigation.navigate('TransactionDetails', { transaction })}
+                onAnswer={answer}
+                onAdd={() => navigation.replace('AddTransaction')}
+              />
+            </FadeIn>
+          ) : null}
+        </View>
+      </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  pressed: { opacity: 0.6 },
-  bars: { flexDirection: 'row', gap: 4, paddingHorizontal: 12, paddingTop: 10 },
-  barTrack: { flex: 1, height: 3, backgroundColor: colors.track, overflow: 'hidden' },
-  barFill: { height: '100%', backgroundColor: colors.ink },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 16 },
-  badgeSquare: { width: 8, height: 8, backgroundColor: colors.ink },
-  storyName: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.ink },
-  storyDate: { fontFamily: fonts.sansMedium, fontSize: 11, letterSpacing: 1.5, color: colors.inkMuted },
-  close: { marginLeft: 'auto', padding: 4 },
+const useStyles = makeStyles((c, isDark) => ({
+  pressed: { opacity: 0.7, transform: [{ scale: 0.97 }] },
+  bars: { flexDirection: 'row', gap: space[1], paddingHorizontal: SCREEN_PADDING, paddingTop: space[4] },
+  barTrack: { flex: 1, height: 3, borderRadius: radius.pill, backgroundColor: c.line, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: radius.pill, backgroundColor: c.ink },
+  topRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: SCREEN_PADDING - space[3] },
+  close: { width: TOUCH_TARGET, height: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' },
 
-  stage: { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
-  emojiTile: {
-    width: 72,
-    height: 72,
-    backgroundColor: '#262626',
+  storyCard: {
+    flex: 1,
+    marginHorizontal: SCREEN_PADDING,
+    marginBottom: space[5],
+    borderRadius: radius.xl,
+    backgroundColor: c.surface,
+    ...elevation(2, c, isDark),
+  },
+  stage: { flex: 1, justifyContent: 'center', paddingHorizontal: space[6] },
+  centre: { alignItems: 'center' },
+  glyphCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 28,
+    marginBottom: space[4],
   },
-  emojiLarge: { fontSize: 34 },
-  eyebrow: { fontFamily: fonts.sansSemiBold, fontSize: 12, letterSpacing: 2.4, color: colors.inkMuted },
-  heading: { fontFamily: fonts.serifBold, fontSize: 44, lineHeight: 54, color: colors.ink, marginTop: 6 },
-  hero: { fontFamily: fonts.serif, fontSize: 64, lineHeight: 82, color: colors.ink },
-  heroCaption: { fontFamily: fonts.serifItalic, fontSize: 19, color: colors.inkMuted, marginTop: -4 },
-  body: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 25, color: colors.inkMuted, marginTop: 14 },
-  changeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 14 },
-  changeLabel: { fontFamily: fonts.sansSemiBold, fontSize: 12, letterSpacing: 0.8, color: colors.ink, marginTop: 4 },
+  glyphIncome: { backgroundColor: c.peacockSoft },
+  eyebrow: { ...type.label, color: c.inkMuted },
+  storyWord: { ...type.story, color: c.ink, marginTop: space[1], textAlign: 'center' },
+  body: { ...type.body, color: c.inkMuted, textAlign: 'center' },
+  bodyGap: { marginTop: space[6] },
+  hero: { ...type.amountHero, color: c.ink },
+  heroIncome: { color: c.peacock },
+  meta: { ...type.caption, color: c.inkMuted, marginTop: space[1], textAlign: 'center' },
+  caption: { ...type.caption, color: c.inkMuted },
 
-  list: { marginTop: 40, gap: 18 },
-  shareRow: { gap: 8 },
-  shareTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  rowTitle: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.ink },
-  rowAmount: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.ink },
-  track: { height: 4, backgroundColor: colors.track, overflow: 'hidden' },
-  trackFill: { height: '100%', backgroundColor: colors.ink },
-  txRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.divider, paddingBottom: 14 },
-  txText: { flex: 1, marginRight: 12 },
-  txMeta: { fontFamily: fonts.sans, fontSize: 11, color: colors.inkMuted, marginTop: 3 },
-  more: { fontFamily: fonts.sansSemiBold, fontSize: 11, letterSpacing: 2, color: colors.inkMuted },
+  cardArea: { padding: space[6], paddingTop: 0, minHeight: 200, justifyContent: 'flex-end' },
+  facts: { borderTopWidth: 1, borderTopColor: c.line, paddingTop: space[5] },
+  factsIncome: { gap: space[4] },
+  factLine: { ...type.body, color: c.ink },
+  factBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: space[4] },
+  factAmount: { ...type.amountMedium, color: c.ink },
+  smallButton: { minHeight: TOUCH_TARGET, paddingHorizontal: space[5] },
+  fullButton: { alignSelf: 'stretch' },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: space[3], marginTop: space[5] },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.line },
+  dotActive: { backgroundColor: c.ink },
 
-  hint: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 10.5,
-    letterSpacing: 2,
-    color: colors.inkFaint,
-    textAlign: 'center',
-    paddingVertical: 20,
+  incomeRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
+  incomeIcon: {
+    width: TOUCH_TARGET,
+    height: TOUCH_TARGET,
+    borderRadius: TOUCH_TARGET / 2,
+    backgroundColor: c.peacockSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cta: { marginHorizontal: 20, marginBottom: 20 },
-});
+  incomeText: { flex: 1 },
+  incomeSource: { ...type.bodyStrong, color: c.ink },
+  incomeAmount: { ...type.amountMedium, color: c.peacock },
+
+  questionArea: { alignItems: 'stretch', gap: space[2] },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  choice: {
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[2],
+    minHeight: 52,
+    paddingHorizontal: space[4],
+    borderRadius: radius.m,
+    borderWidth: 1,
+    borderColor: c.line,
+    backgroundColor: c.surface,
+  },
+  choiceSelected: { backgroundColor: c.surfaceSunken, borderColor: c.ink },
+  answered: { flexGrow: 0 },
+  choiceLabel: { ...type.label, color: c.ink },
+  error: { ...type.caption, color: c.low, textAlign: 'center' },
+}));

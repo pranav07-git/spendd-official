@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Avatar } from '../components/Avatar';
 import { PrimaryButton } from '../components/Buttons';
-import { ChevronLeftIcon } from '../components/Icons';
+import { Header } from '../components/Header';
+import { Card } from '../components/Layout';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
 import { DEFAULT_PROFILE, getProfile, saveProfile } from '../storage/appState';
-import { colors, fonts } from '../theme';
+import { makeStyles, radius, SCREEN_PADDING, SECTION_GAP, space, TOUCH_TARGET, type, useTheme } from '../theme';
 
 /** null = the name's initial. */
 const AVATARS: (string | null)[] = [null, '😎', '🦊', '🐼', '🌸', '🚀', '🎧', '⚡', '🍀', '🐯', '☕', '🎨'];
 
 export function EditProfileScreen({ navigation }: ScreenProps<'EditProfile'>) {
+  const s = useStyles();
+  const { c } = useTheme();
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -29,7 +32,7 @@ export function EditProfileScreen({ navigation }: ScreenProps<'EditProfile'>) {
   const save = async () => {
     const trimmed = name.trim().replace(/\s+/g, ' ');
     if (!trimmed) {
-      setError('Enter your name.');
+      setError('Add your name to save your profile.');
       return;
     }
     setSaving(true);
@@ -37,7 +40,7 @@ export function EditProfileScreen({ navigation }: ScreenProps<'EditProfile'>) {
       await saveProfile({ name: trimmed, avatar });
       navigation.goBack();
     } catch {
-      setError('Couldn’t save. Try again.');
+      setError('Couldn’t save your profile. Try again.');
       setSaving(false);
     }
   };
@@ -46,39 +49,28 @@ export function EditProfileScreen({ navigation }: ScreenProps<'EditProfile'>) {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={navigation.goBack}
-          style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <ChevronLeftIcon size={20} color={colors.ink} strokeWidth={2.2} />
-        </Pressable>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Edit Profile
-        </Text>
-      </View>
+      <Header title="Edit profile" onBack={navigation.goBack} />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Avatar profile={preview} size={96} style={styles.preview} />
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Avatar profile={preview} size={96} style={s.preview} />
 
-        <View style={styles.card}>
-          <Text style={styles.label}>YOUR NAME</Text>
+        <Card style={s.card}>
+          <Text style={s.label}>Your name</Text>
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder="What should we call you?"
-            placeholderTextColor={colors.inkFaint}
-            style={styles.input}
+            placeholderTextColor={c.inkSubtle}
+            style={s.input}
             autoCapitalize="words"
             maxLength={24}
             accessibilityLabel="Your name"
           />
-        </View>
+        </Card>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>AVATAR</Text>
-          <View style={styles.grid}>
+        <Card style={s.card}>
+          <Text style={s.label}>Avatar</Text>
+          <View style={s.grid}>
             {AVATARS.map(option => {
               const selected = option === avatar;
               return (
@@ -88,57 +80,45 @@ export function EditProfileScreen({ navigation }: ScreenProps<'EditProfile'>) {
                   accessibilityLabel={option ?? 'Initial of your name'}
                   accessibilityState={{ selected }}
                   onPress={() => setAvatar(option)}
-                  style={[styles.option, selected && styles.optionSelected]}>
+                  style={({ pressed }) => [s.option, selected && s.optionSelected, pressed && s.pressed]}>
                   <Avatar profile={{ name: name || ' ', avatar: option }} size={44} />
                 </Pressable>
               );
             })}
           </View>
-        </View>
+        </Card>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <PrimaryButton label="SAVE" onPress={save} loading={saving} style={styles.save} />
+        {error ? <Text style={s.error}>{error}</Text> : null}
+        <PrimaryButton label="Save profile" onPress={save} loading={saving} style={s.save} />
       </ScrollView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  pressed: { opacity: 0.6 },
-  header: { height: 72, justifyContent: 'center', alignItems: 'center' },
-  back: {
-    position: 'absolute',
-    left: 24,
-    width: 40,
-    height: 40,
-    backgroundColor: '#2A2A2A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: colors.ink },
-  content: { paddingHorizontal: 24, paddingBottom: 32 },
-  preview: { alignSelf: 'center', marginTop: 24, marginBottom: 32 },
-  card: {
-    backgroundColor: '#1C1C1C',
-    borderRadius: 22,
-    paddingHorizontal: 24,
-    paddingVertical: 22,
-    gap: 16,
-    marginBottom: 16,
-  },
-  label: { fontFamily: fonts.sansMedium, fontSize: 11, letterSpacing: 2.2, color: colors.inkMuted },
+const useStyles = makeStyles(c => ({
+  pressed: { transform: [{ scale: 0.97 }] },
+  content: { paddingHorizontal: SCREEN_PADDING, paddingBottom: SECTION_GAP },
+  preview: { alignSelf: 'center', marginTop: space[4], marginBottom: SECTION_GAP },
+  card: { gap: space[3], marginBottom: space[3] },
+  label: { ...type.label, color: c.inkMuted },
   input: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 18,
-    color: colors.ink,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
-    paddingVertical: 8,
-    marginTop: -8,
+    ...type.body,
+    color: c.ink,
+    minHeight: 48,
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.s,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  option: { padding: 3, borderWidth: 1, borderColor: 'transparent' },
-  optionSelected: { borderColor: colors.ink },
-  error: { fontFamily: fonts.sans, fontSize: 13, color: colors.danger, textAlign: 'center', marginTop: 4 },
-  save: { marginTop: 16 },
-});
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  option: {
+    minWidth: TOUCH_TARGET,
+    padding: 3,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  optionSelected: { borderColor: c.ink, backgroundColor: c.surfaceSunken },
+  error: { ...type.caption, color: c.low, textAlign: 'center', marginTop: space[1] },
+  save: { marginTop: space[6] },
+}));

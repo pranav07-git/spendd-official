@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './src/navigation/types';
 import { AddTransactionScreen } from './src/screens/AddTransactionScreen';
@@ -14,20 +14,15 @@ import { EditProfileScreen } from './src/screens/EditProfileScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
 import { IntroScreen } from './src/screens/IntroScreen';
 import { SetBudgetScreen } from './src/screens/SetBudgetScreen';
-import { StatementScreen } from './src/screens/StatementScreen';
 import { StoryScreen } from './src/screens/StoryScreen';
 import { TransactionDetailsScreen } from './src/screens/TransactionDetailsScreen';
 import { UnlockScreen } from './src/screens/UnlockScreen';
 import { clearAppState, isSetupComplete } from './src/storage/appState';
 import { clearSecureData, hasPin } from './src/storage/secure';
-import { colors } from './src/theme';
+import { ThemeProvider, useTheme } from './src/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const theme: Theme = {
-  ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: colors.background, card: colors.background },
-};
 
 async function resolveInitialRoute(): Promise<keyof RootStackParamList> {
   if ((await isSetupComplete()) && (await hasPin())) {
@@ -38,7 +33,19 @@ async function resolveInitialRoute(): Promise<keyof RootStackParamList> {
   return 'Intro';
 }
 
-function App() {
+function AppRoot() {
+  const { c, isDark } = useTheme();
+  const navTheme: Theme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme : DefaultTheme).colors,
+      background: c.bg,
+      card: c.surface,
+      text: c.ink,
+      border: c.line,
+      primary: c.marigold,
+    },
+  };
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
 
   useEffect(() => {
@@ -49,18 +56,17 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       {initialRoute ? (
-        <NavigationContainer theme={theme}>
+        <NavigationContainer theme={navTheme}>
           <Stack.Navigator
             initialRouteName={initialRoute}
             screenOptions={{
               headerShown: false,
               animation: 'slide_from_right',
-              contentStyle: { backgroundColor: colors.background },
+              contentStyle: { backgroundColor: c.bg },
             }}>
             <Stack.Screen name="Intro" component={IntroScreen} />
-            <Stack.Screen name="Statement" component={StatementScreen} />
             <Stack.Screen name="Consent" component={ConsentScreen} />
             <Stack.Screen name="CreatePin" component={CreatePinScreen} />
             <Stack.Screen name="ConfirmPin" component={ConfirmPinScreen} />
@@ -76,14 +82,20 @@ function App() {
           </Stack.Navigator>
         </NavigationContainer>
       ) : (
-        <View style={styles.splash} />
+        <View style={[styles.splash, { backgroundColor: c.bg }]} />
       )}
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  splash: { flex: 1, backgroundColor: colors.background },
-});
+const styles = StyleSheet.create({ splash: { flex: 1 } });
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppRoot />
+    </ThemeProvider>
+  );
+}
 
 export default App;

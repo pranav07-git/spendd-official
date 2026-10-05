@@ -7,7 +7,8 @@ export type DailyStatus = {
 };
 
 /** A card in Today's Story, built from real transactions (see transactions/stories.ts). */
-export type StoryItem = { id: string; emoji: string; title: string; caption: string };
+/** `glyph` is a category name or a card kind (Income, Question, Empty) for CategoryGlyph. */
+export type StoryItem = { id: string; glyph: string; title: string; caption: string };
 
 export type InsightKind = 'agent' | 'alert' | 'win';
 export type Insight = {
@@ -17,7 +18,7 @@ export type Insight = {
   caption: string;
   /** Higher = more important; insights are shown in descending order. */
   score: number;
-  /** Written by the on-device model rather than the rules engine. */
+  /** Written by Spendd AI (Gemini, via the server) rather than the rules engine. */
   source?: 'ai';
 };
 
@@ -28,7 +29,7 @@ export type DailyBudget = {
   basis: 'budget' | 'usual';
 };
 
-export type Habit = { id: string; emoji: string; label: string; sharePct: number };
+export type Habit = { id: string; label: string; sharePct: number };
 
 export type Forecast = {
   /** "October" or a budget's period label. */

@@ -1,5 +1,4 @@
 import { budgetStatus, periodFor } from '../src/transactions/budget';
-import { todaysStory } from '../src/transactions/stories';
 import type { Transaction } from '../src/transactions/types';
 
 const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime();
@@ -91,19 +90,5 @@ describe('budgetStatus', () => {
     expect(ended.state).toBe('ended');
     expect(ended.spent).toBe(3000);
     expect(ended.daysLeft).toBe(0);
-  });
-});
-
-describe('todaysStory', () => {
-  it('is a single empty slide when nothing was spent today', () => {
-    expect(todaysStory([tx({ occurredAt: at(2026, 10, 4) })], NOW)).toEqual([{ kind: 'empty' }]);
-  });
-
-  it('opens with the total, then categories biggest first', () => {
-    const slides = todaysStory(
-      [tx({ amount: 50, category: 'Food' }), tx({ amount: 400, category: 'Medical' })],
-      NOW,
-    );
-    expect(slides.map(s => (s.kind === 'category' ? s.item.category : s.kind))).toEqual(['total', 'Medical', 'Food']);
   });
 });

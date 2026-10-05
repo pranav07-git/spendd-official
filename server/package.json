@@ -1,0 +1,23 @@
+{
+  "name": "spendd-server",
+  "version": "0.1.0",
+  "description": "Spendd insights API: turns a phone's computed spending facts into structured insights with Gemini.",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.ts",
+    "dev": "node --env-file-if-exists=.env --watch src/server.ts",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "dependencies": {
+    "@google/genai": "^2.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=23.6"
+  }
+}
