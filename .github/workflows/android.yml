@@ -1,0 +1,75 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: JS tests, types and lint
+        run: |
+          npx jest --ci
+          npx tsc --noEmit
+          npx eslint .
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Kotlin unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      # Release signing comes from four repository secrets. Without them a debug APK is built instead.
+      - name: Decode release key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SPENDD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "file=$RUNNER_TEMP/release.keystore" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build APK
+        working-directory: android
+        env:
+          SPENDD_KEYSTORE_FILE: ${{ steps.signing.outputs.file }}
+          SPENDD_KEYSTORE_PASSWORD: ${{ secrets.SPENDD_KEYSTORE_PASSWORD }}
+          SPENDD_KEY_ALIAS: ${{ secrets.SPENDD_KEY_ALIAS }}
+          SPENDD_KEY_PASSWORD: ${{ secrets.SPENDD_KEY_PASSWORD }}
+        run: |
+          if [ -n "$SPENDD_KEYSTORE_FILE" ]; then
+            ./gradlew :app:assembleRelease --no-daemon
+          else
+            echo "::warning::No release key secrets; building a debug APK."
+            ./gradlew :app:assembleDebug --no-daemon
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spendd-apk
+          path: android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
