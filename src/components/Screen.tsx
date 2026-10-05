@@ -1,18 +1,23 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { makeStyles, useTheme } from '../theme';
+import { GlassBackdrop } from './Glass';
 
-/** Full-bleed black screen that keeps content clear of the status and nav bars. */
+/**
+ * Full-bleed screen on the app background that keeps content clear of the status and nav bars.
+ * In dark mode it adds the faint glows that give the glass surfaces depth.
+ */
 export function Screen({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const insets = useSafeAreaInsets();
+  const s = useStyles();
+  const { isDark } = useTheme();
   return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }, style]}>
+    <View style={[s.root, { paddingTop: insets.top, paddingBottom: insets.bottom }, style]}>
+      {isDark ? <GlassBackdrop /> : null}
       {children}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-});
+const useStyles = makeStyles(c => ({ root: { flex: 1, backgroundColor: c.bg } }));

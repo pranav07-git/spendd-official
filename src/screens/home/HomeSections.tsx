@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
+import { TextButton } from '../../components/Buttons';
 import {
   AlertTriangleIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   BotIcon,
-  ChevronRightIcon,
   FlameIcon,
   InfoIcon,
 } from '../../components/Icons';
+import { Card, SectionHeading } from '../../components/Layout';
 import type {
   DailyBudget,
   DailyStatus,
@@ -17,9 +18,14 @@ import type {
   InsightKind,
   StoryItem,
 } from '../../insights/types';
-import { colors, fonts } from '../../theme';
+import { formatRupees } from '../../transactions/format';
+import { elevation, jarColorFor, makeStyles, radius, space, type, useTheme } from '../../theme';
+import { CategoryGlyph } from '../../components/CategoryGlyph';
 
-export const formatRupees = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
+// Kept as an export from here for screens that already import it.
+export { formatRupees };
+
+/** Jar colours in a fixed order, for tiles that need one. */
 
 /** Gentle fade-and-rise entrance, staggered by `index`. */
 export function FadeIn({ index, children }: { index: number; children: ReactNode }) {
@@ -46,91 +52,87 @@ export function FadeIn({ index, children }: { index: number; children: ReactNode
   );
 }
 
+/** Section heading with an optional quiet action ("See all"). */
 export function SectionTitle({ title, action }: { title: string; action?: { label: string; onPress: () => void } }) {
+  const s = useStyles();
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle} accessibilityRole="header">
-        {title}
-      </Text>
-      {action ? (
-        <Pressable
-          accessibilityRole="button"
-          hitSlop={12}
-          onPress={action.onPress}
-          style={({ pressed }) => [styles.sectionAction, pressed && styles.pressed]}>
-          <Text style={styles.sectionActionLabel}>{action.label}</Text>
-          <ChevronRightIcon size={16} color={colors.ink} strokeWidth={1.8} />
-        </Pressable>
-      ) : null}
-    </View>
+    <SectionHeading
+      title={title}
+      action={action ? <TextButton label={action.label} onPress={action.onPress} style={s.sectionAction} /> : undefined}
+    />
   );
 }
 
 export function DailyStatusCard({ status }: { status: DailyStatus }) {
+  const s = useStyles();
+  const { c } = useTheme();
   const less = (status.changeVsUsualPct ?? 0) <= 0;
   const Arrow = less ? ArrowDownIcon : ArrowUpIcon;
+  const changeColor = less ? c.peacock : c.headsup;
   return (
-    <View style={[styles.card, styles.cardPadded]}>
-      <View style={styles.badge}>
-        <View style={styles.badgeSquare} />
-        <Text style={styles.badgeLabel}>DAILY STATUS</Text>
-      </View>
+    <Card>
+      <Text style={s.cardLabel}>Daily status</Text>
 
-      <View style={styles.amountRow} accessible accessibilityLabel={`${formatRupees(status.safeToSpend)} safe to spend`}>
-        <Text style={styles.heroAmount}>{formatRupees(status.safeToSpend)}</Text>
-        <Text style={styles.heroCaption}>safe to spend</Text>
+      <View accessible accessibilityLabel={`${formatRupees(status.safeToSpend)} safe to spend`}>
+        <Text style={s.heroAmount}>{formatRupees(status.safeToSpend)}</Text>
+        <Text style={s.heroCaption}>safe to spend</Text>
       </View>
 
       {status.spendBelowToday != null ? (
-        <Text style={styles.statusLine}>
-          Spend below <Text style={styles.underline}>{formatRupees(status.spendBelowToday)}</Text> today to stay on
-          track
+        <Text style={s.statusLine}>
+          Spend under <Text style={s.strong}>{formatRupees(status.spendBelowToday)}</Text> today to stay on track.
         </Text>
       ) : (
-        <Text style={styles.statusLine}>Log a few days of spending, or set a budget, to get a daily limit.</Text>
+        <Text style={s.statusLine}>Log a few days of spends, or set a budget, and you’ll get a daily limit here.</Text>
       )}
       {status.changeVsUsualPct != null ? (
-        <View style={styles.changeRow}>
-          <Arrow size={13} color={colors.ink} strokeWidth={2} />
-          <Text style={styles.changeLabel}>
-            {Math.abs(status.changeVsUsualPct)}% {less ? 'LESS' : 'MORE'} THAN YOUR USUAL SPENDING
+        <View style={s.changeRow}>
+          <Arrow size={16} color={changeColor} strokeWidth={2} />
+          <Text style={[s.changeLabel, { color: changeColor }]}>
+            {Math.abs(status.changeVsUsualPct)}% {less ? 'less' : 'more'} than your usual spending
           </Text>
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
-const STORY_CARD_WIDTH = 160;
+const STORY_CARD_WIDTH = 148;
+const STORY_GAP = space[3];
 
 export function StoryStrip({ items, onPress }: { items: StoryItem[]; onPress: (index: number) => void }) {
+  const s = useStyles();
+  const { c } = useTheme();
   return (
-    <View style={[styles.card, styles.storyFrame]}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={STORY_CARD_WIDTH}
-        decelerationRate="fast">
-        {items.map((item, i) => (
-          <Pressable
-            key={item.id}
-            accessibilityRole="button"
-            accessibilityLabel={`${item.title}, ${item.caption}`}
-            accessibilityHint="Opens the story"
-            onPress={() => onPress(i)}
-            android_ripple={{ color: '#1A1A1A' }}
-            style={[styles.storyCard, i < items.length - 1 && styles.storyDivider]}>
-            <View style={styles.emojiTile}>
-              <Text style={styles.emoji}>{item.emoji}</Text>
-            </View>
-            <View>
-              <Text style={styles.storyTitle}>{item.title}</Text>
-              <Text style={styles.storyCaption}>{item.caption.toUpperCase()}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
-    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={STORY_CARD_WIDTH + STORY_GAP}
+      decelerationRate="fast"
+      style={s.storyScroll}
+      contentContainerStyle={s.storyRow}>
+      {items.map((item, i) => (
+        <Pressable
+          key={item.id}
+          accessibilityRole="button"
+          accessibilityLabel={`${item.title}, ${item.caption}`}
+          accessibilityHint="Opens the story"
+          onPress={() => onPress(i)}
+          style={({ pressed }) => [s.storyCard, pressed && s.pressed]}>
+          <View style={[s.tile, { backgroundColor: jarColorFor(item.id, c) }]}>
+            <CategoryGlyph category={item.glyph} size={20} />
+          </View>
+          <View>
+            <Text style={s.storyTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Text style={s.caption} numberOfLines={2}>
+              {item.caption}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -141,53 +143,66 @@ const INSIGHT_ICONS: Record<InsightKind, (p: { size: number; color: string; stro
 };
 
 export function InsightsCard({ items }: { items: Insight[] }) {
+  const s = useStyles();
+  const { c } = useTheme();
+  const look: Record<InsightKind, { bg: string; fg: string }> = {
+    agent: { bg: c.surfaceSunken, fg: c.ink },
+    alert: { bg: c.marigoldSoft, fg: c.headsup },
+    win: { bg: c.peacockSoft, fg: c.peacock },
+  };
   return (
-    <View style={styles.card}>
+    <Card padded={false}>
       {items.map((item, i) => {
         const Icon = INSIGHT_ICONS[item.kind];
+        const { bg, fg } = look[item.kind];
         return (
           <View
             key={item.id}
-            style={[styles.insightRow, i > 0 && styles.insightDivider]}
+            style={[s.insightRow, i > 0 && s.divider]}
             accessible
             accessibilityLabel={`${item.title}. ${item.caption}`}>
-            <View style={styles.insightIcon}>
-              <Icon size={20} color={colors.background} strokeWidth={1.8} />
+            <View style={[s.tile, { backgroundColor: bg }]}>
+              <Icon size={20} color={fg} strokeWidth={1.8} />
             </View>
-            <View style={styles.insightText}>
-              <Text style={styles.insightTitle}>{item.title}</Text>
-              <Text style={styles.insightCaption}>{item.caption.toUpperCase()}</Text>
+            <View style={s.flex}>
+              <Text style={s.insightTitle}>{item.title}</Text>
+              <Text style={s.caption}>{item.caption}</Text>
             </View>
           </View>
         );
       })}
-    </View>
+    </Card>
   );
 }
 
-/** Says where the insights above came from: the on-device model, or that it's rewriting them. */
+/** Says where the insights above came from: Spendd AI (Gemini), or that it's writing them. */
 export function AiNote({ thinking, written }: { thinking: boolean; written: boolean }) {
+  const s = useStyles();
+  const { c } = useTheme();
   if (!thinking && !written) {
     return null;
   }
   return (
-    <View style={styles.aiNote} accessibilityLiveRegion="polite">
+    <View style={s.aiNote} accessibilityLiveRegion="polite">
       {thinking ? (
-        <ActivityIndicator size="small" color={colors.inkMuted} />
+        <ActivityIndicator size="small" color={c.inkMuted} />
       ) : (
-        <BotIcon size={14} color={colors.inkMuted} strokeWidth={1.8} />
+        <BotIcon size={14} color={c.inkMuted} strokeWidth={1.8} />
       )}
-      <Text style={styles.aiNoteText}>
-        {thinking ? 'SPENDD AI IS WRITING YOUR INSIGHTS…' : 'WRITTEN BY SPENDD AI ON YOUR PHONE'}
+      <Text style={s.aiNoteText}>
+        {thinking ? 'Spendd AI is writing your insights…' : 'Written by Spendd from your numbers'}
       </Text>
     </View>
   );
 }
 
 export function DailyBudgetCard({ budget }: { budget: DailyBudget }) {
+  const s = useStyles();
+  const { c } = useTheme();
   const [explained, setExplained] = useState(false);
   const fill = useRef(new Animated.Value(0)).current;
   const usedPct = Math.round(budget.usedFraction * 100);
+  const fillColor = budget.usedFraction >= 0.75 ? c.headsup : c.peacock;
 
   useEffect(() => {
     Animated.timing(fill, {
@@ -200,51 +215,62 @@ export function DailyBudgetCard({ budget }: { budget: DailyBudget }) {
   }, [budget.usedFraction, fill]);
 
   return (
-    <View style={[styles.card, styles.cardPadded]}>
-      <Text style={styles.budgetLabel}>DAILY BUDGET</Text>
-      <Text style={styles.budgetAmount}>{formatRupees(budget.amount)}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="What is the daily budget?"
-        accessibilityState={{ expanded: explained }}
-        hitSlop={8}
-        onPress={() => setExplained(e => !e)}
-        style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}>
-        <InfoIcon size={18} color={colors.background} strokeWidth={1.8} />
-      </Pressable>
+    <Card>
+      <View style={s.budgetHead}>
+        <View style={s.flex}>
+          <Text style={s.cardLabel}>Daily budget</Text>
+          <Text style={s.budgetAmount}>{formatRupees(budget.amount)}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="What is the daily budget?"
+          accessibilityState={{ expanded: explained }}
+          onPress={() => setExplained(e => !e)}
+          style={({ pressed }) => [s.infoButton, pressed && s.pressed]}>
+          <View style={[s.infoDot, explained && s.infoDotActive]}>
+            <InfoIcon size={18} color={c.ink} strokeWidth={1.8} />
+          </View>
+        </Pressable>
+      </View>
 
       <View
-        style={styles.track}
+        style={s.track}
         accessibilityRole="progressbar"
         accessibilityLabel={`${usedPct}% of today's budget used`}
         accessibilityValue={{ min: 0, max: 100, now: usedPct }}>
         <Animated.View
-          style={[styles.trackFill, { width: fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
+          style={[
+            s.trackFill,
+            { backgroundColor: fillColor, width: fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
+          ]}
         />
       </View>
-      <Text style={styles.budgetCaption}>
-        {budget.basis === 'budget' ? 'TO STAY WITHIN YOUR BUDGET' : 'BASED ON YOUR USUAL DAY'}
+      <Text style={s.budgetCaption}>
+        {usedPct}% used · {budget.basis === 'budget' ? 'keeps you within your budget' : 'based on your usual day'}
       </Text>
 
       {explained ? (
-        <Text style={styles.explainer}>
+        <Text style={s.explainer}>
           {budget.basis === 'budget'
             ? 'What’s left of your budget, split evenly across the days remaining.'
-            : 'Your average day over the last 30 days. Set a budget on the Accounts tab to plan against a goal instead.'}{' '}
+            : 'Your average day of spending since you started logging (up to the last 30 days, not counting today). Set a budget on the Accounts tab to plan against a goal instead.'}{' '}
           You’ve used {usedPct}% of it so far today.
         </Text>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
+/** Read-only habit chips (DESIGN.md §5.5): surface with a line outline. */
 export function HabitChips({ habits }: { habits: Habit[] }) {
+  const s = useStyles();
   return (
-    <View style={styles.chips}>
+    <View style={s.chips}>
       {habits.map(h => (
-        <View key={h.id} style={styles.chip} accessible accessibilityLabel={`${h.label} ${h.sharePct} percent`}>
-          <Text style={styles.chipLabel}>
-            {h.emoji} {h.label.toUpperCase()} {h.sharePct}%
+        <View key={h.id} style={s.chip} accessible accessibilityLabel={`${h.label} ${h.sharePct} percent`}>
+          <CategoryGlyph category={h.label} size={16} />
+          <Text style={s.chipLabel}>
+            {h.label} <Text style={s.chipPct}>{h.sharePct}%</Text>
           </Text>
         </View>
       ))}
@@ -252,132 +278,98 @@ export function HabitChips({ habits }: { habits: Habit[] }) {
   );
 }
 
-const styles = StyleSheet.create({
-  pressed: { opacity: 0.6 },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  cardPadded: { padding: 24 },
-
-  sectionHeader: {
-    flexDirection: 'row',
+const useStyles = makeStyles((c, isDark) => ({
+  pressed: { transform: [{ scale: 0.97 }], opacity: 0.92 },
+  flex: { flex: 1 },
+  divider: { borderTopWidth: 1, borderTopColor: c.line },
+  caption: { ...type.caption, color: c.inkMuted, marginTop: 2 },
+  tile: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.s + 4,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 40,
-    marginBottom: 16,
+    justifyContent: 'center',
   },
-  sectionTitle: { fontFamily: fonts.serif, fontSize: 26, color: colors.ink },
-  sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sectionActionLabel: { fontFamily: fonts.sansSemiBold, fontSize: 13, letterSpacing: 2, color: colors.ink },
 
-  badge: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.ink,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  badgeSquare: { width: 7, height: 7, backgroundColor: colors.ink },
-  badgeLabel: { fontFamily: fonts.sansMedium, fontSize: 12, letterSpacing: 1.6, color: colors.ink },
-  amountRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 14 },
-  heroAmount: { fontFamily: fonts.serif, fontSize: 50, lineHeight: 66, color: colors.ink },
-  heroCaption: { fontFamily: fonts.serifItalic, fontSize: 17, color: colors.inkMuted, marginLeft: 10 },
-  statusLine: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 24, color: colors.ink, marginTop: 20 },
-  underline: { textDecorationLine: 'underline' },
-  changeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  changeLabel: { fontFamily: fonts.sansSemiBold, fontSize: 12, letterSpacing: 0.6, color: colors.ink },
+  sectionAction: { alignSelf: 'auto', paddingHorizontal: space[2], marginRight: -space[2] },
 
-  storyFrame: { borderRadius: 20 },
+  cardLabel: { ...type.label, color: c.inkMuted },
+  heroAmount: { ...type.amountHero, color: c.ink, marginTop: space[2] },
+  heroCaption: { ...type.body, color: c.inkMuted },
+  statusLine: { ...type.body, color: c.ink, marginTop: space[4] },
+  strong: { ...type.bodyStrong, color: c.ink },
+  changeRow: { flexDirection: 'row', alignItems: 'center', gap: space[1], marginTop: space[2] },
+  changeLabel: { ...type.label },
+
+  storyScroll: { marginHorizontal: -space[5] },
+  storyRow: { paddingHorizontal: space[5], gap: STORY_GAP, paddingBottom: space[1] },
   storyCard: {
     width: STORY_CARD_WIDTH,
-    height: 190,
-    padding: 16,
+    minHeight: 168,
+    padding: space[4],
+    borderRadius: radius.l,
+    backgroundColor: c.surface,
     justifyContent: 'space-between',
+    gap: space[4],
+    ...elevation(1, c, isDark),
   },
-  storyDivider: { borderRightWidth: 1, borderRightColor: colors.cardBorder },
-  emojiTile: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#262626',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emoji: { fontSize: 18 },
-  storyTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.ink },
-  storyCaption: { fontFamily: fonts.sans, fontSize: 11.5, color: colors.inkMuted, marginTop: 4 },
+  storyTitle: { ...type.bodyStrong, color: c.ink },
 
-  insightRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 16, paddingVertical: 18 },
-  insightDivider: { borderTopWidth: 1, borderTopColor: colors.divider },
-  insightIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  insightText: { flex: 1 },
-  insightTitle: { fontFamily: fonts.serifItalic, fontSize: 19, lineHeight: 25, color: colors.ink },
-  insightCaption: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    lineHeight: 17,
-    letterSpacing: 0.4,
-    color: colors.inkMuted,
-    marginTop: 4,
-  },
+  insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], padding: space[4] },
+  insightTitle: { ...type.bodyStrong, color: c.ink },
 
-  aiNote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 4 },
-  aiNoteText: { fontFamily: fonts.sansSemiBold, fontSize: 10.5, letterSpacing: 1.6, color: colors.inkMuted },
+  aiNote: { flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: space[3], paddingHorizontal: space[1] },
+  aiNoteText: { ...type.caption, color: c.inkMuted, flexShrink: 1 },
 
-  budgetLabel: { fontFamily: fonts.sansMedium, fontSize: 12, letterSpacing: 2, color: colors.inkMuted },
-  budgetAmount: { fontFamily: fonts.serif, fontSize: 34, lineHeight: 46, color: colors.ink, marginTop: 4 },
+  budgetHead: { flexDirection: 'row', alignItems: 'flex-start' },
+  budgetAmount: { ...type.amountMedium, color: c.ink, marginTop: space[1] },
   infoButton: {
-    position: 'absolute',
-    top: 24,
-    right: 24,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -space[1],
+    marginRight: -space[1],
+  },
+  infoDot: {
     width: 32,
     height: 32,
-    backgroundColor: colors.ink,
+    borderRadius: radius.pill,
+    backgroundColor: c.surfaceSunken,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  track: { height: 6, backgroundColor: colors.track, marginTop: 18, overflow: 'hidden' },
-  trackFill: { height: '100%', backgroundColor: colors.ink },
-  budgetCaption: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.inkMuted,
-    textAlign: 'center',
-    marginTop: 12,
+  infoDotActive: { backgroundColor: c.surfaceSunken },
+  track: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: c.surfaceSunken,
+    marginTop: space[4],
+    overflow: 'hidden',
   },
+  trackFill: { height: '100%', borderRadius: radius.pill },
+  budgetCaption: { ...type.caption, color: c.inkMuted, marginTop: space[2] },
   explainer: {
-    fontFamily: fonts.sans,
-    fontSize: 13,
-    lineHeight: 20,
-    color: colors.inkMuted,
-    marginTop: 16,
-    paddingTop: 16,
+    ...type.caption,
+    color: c.inkMuted,
+    marginTop: space[4],
+    paddingTop: space[4],
     borderTopWidth: 1,
-    borderTopColor: colors.divider,
+    borderTopColor: c.line,
   },
 
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   chip: {
-    height: 42,
-    borderRadius: 21,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    backgroundColor: colors.card,
+    minHeight: 36,
+    borderRadius: radius.s,
+    paddingHorizontal: space[3],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: c.line,
   },
-  chipLabel: { fontFamily: fonts.sansSemiBold, fontSize: 13, letterSpacing: 1, color: colors.ink },
-});
+  chipLabel: { ...type.label, color: c.ink },
+  chipPct: { ...type.label, color: c.inkMuted },
+}));

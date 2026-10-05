@@ -3,8 +3,15 @@ package com.spendd.receipts
 import java.util.Calendar
 import kotlin.math.abs
 
-/** One line of OCR output. `height` stands in for font size. */
-data class OcrLine(val text: String, val top: Int, val height: Int)
+/** One line of OCR output. `height` stands in for font size; `confidence` is ML Kit's (0–1). */
+data class OcrLine(
+    val text: String,
+    val top: Int,
+    val height: Int,
+    val left: Int = 0,
+    val width: Int = 0,
+    val confidence: Float = 1f,
+)
 
 enum class Direction { DEBIT, CREDIT }
 
@@ -50,7 +57,7 @@ object ReceiptParser {
     private const val RUPEE_LOOKALIKE = "[₹?%*&=€£fFzZrRE]"
 
     private val MARKED_AMOUNT = Regex("(?:₹|\\brs\\.?|\\binr)\\s*$MONEY", IC)
-    private val BARE_AMOUNT = Regex("^[+\\-]?\\s*(?:($RUPEE_LOOKALIKE|rs\\.?|inr)\\s*)?$MONEY(?:\\s+\\S)?$", IC)
+    private val BARE_AMOUNT = Regex("^[+\\-]?\\s*(?:($RUPEE_LOOKALIKE|rs\\.?|inr)\\s*)?$MONEY(?:\\s*/-)?(?:\\s+\\S)?$", IC)
     private val AMOUNT_LABEL = Regex("\\b(amount|amt|total|debited|credited|paid|sent|received|value)\\b", IC)
     private val AMOUNT_LABEL_ONLY = Regex("^(?:total\\s+|txn\\s+|transaction\\s+|payment\\s+)?(?:amount|amt)(?:\\s+paid|\\s+sent|\\s+received)?\\s*:?$", IC)
     private val PROMO = Regex("\\b(starting|cashback|upto|up to|off|offer|offers|balance|reward|rewards|emi|save|win|won|worth|coupon|scratch)\\b|\\*", IC)

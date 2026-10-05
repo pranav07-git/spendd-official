@@ -27,6 +27,9 @@ class ReceiptIntakeDeviceTest {
 
         val store = TransactionStore(context)
         val before = ids(store)
+        // A screenshot already in the user's log is correctly skipped as "Already logged".
+        val alreadyLogged = all(store).count { it.optString("txnRef") == NAVI_TXN_REF }.coerceAtMost(1)
+        val expectedNew = names.size - if ("navi_ticket.jpg" in names) alreadyLogged else 0
         val uris = names.map { name ->
             val file = File(context.cacheDir, name)
             assets.open("receipts/$name").use { input -> file.outputStream().use { input.copyTo(it) } }
@@ -39,12 +42,12 @@ class ReceiptIntakeDeviceTest {
         do {
             Thread.sleep(500)
             added = all(store).filter { it.getString("id") !in before }
-        } while (added.size < names.size && System.currentTimeMillis() < deadline)
+        } while (added.size < expectedNew && System.currentTimeMillis() < deadline)
 
         try {
-            assertEquals("transactions logged: $added", names.size, added.size)
+            assertEquals("transactions logged: $added", expectedNew, added.size)
             val amounts = added.map { it.optDouble("amount") }.sorted()
-            assertEquals(listOf(1.0, 1.0, 1000.0), amounts)
+            assertEquals(listOf(1.0, 1.0, 1000.0).dropLast(names.size - expectedNew), amounts)
             added.forEach { assertEquals("Intake test", it.getString("source")) }
             assertEquals(true, File(context.filesDir, "receipt-inbox").listFiles().orEmpty().isEmpty())
         } finally {
@@ -55,6 +58,10 @@ class ReceiptIntakeDeviceTest {
 
     private fun all(store: TransactionStore): List<JSONObject> =
         store.readAll().let { array -> (0 until array.length()).map { array.getJSONObject(it) } }
+
+    private companion object {
+        const val NAVI_TXN_REF = "656116935626"
+    }
 
     private fun ids(store: TransactionStore) = all(store).map { it.getString("id") }.toSet()
 }

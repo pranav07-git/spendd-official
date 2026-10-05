@@ -1,25 +1,19 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { TabKey } from '../screens/home/TabBar';
 import type { Transaction } from '../transactions/types';
-
-export type PickedStatement = {
-  uri: string;
-  name: string;
-  size: number | null;
-  type: string | null;
-};
 
 export type RootStackParamList = {
   Intro: undefined;
-  Statement: undefined;
-  Consent: { statement: PickedStatement | null };
+  Consent: undefined;
   CreatePin: undefined;
   ConfirmPin: { pin: string };
   Biometric: undefined;
   Unlock: undefined;
-  Home: undefined;
+  /** Optionally opens a tab, with a search filled in on Transactions. */
+  Home: { tab?: TabKey; query?: string } | undefined;
   TransactionDetails: { transaction: Transaction };
   AddTransaction: undefined;
-  /** Index into todaysStory(): 0 is the day's total, then one per category. */
+  /** Index into monthlyStory(): the month's categories, then income, then payments to place. */
   Story: { startIndex: number };
   SetBudget: undefined;
   EditProfile: undefined;

@@ -3,6 +3,7 @@ package com.spendd.receipts
 import android.content.Context
 import android.net.Uri
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import java.io.File
@@ -42,6 +43,9 @@ object ReceiptIntake {
                     ),
                 )
                 .addTag(ReceiptWorker.TAG)
+                // User-triggered and short: expedited jobs start at once and are far less likely
+                // to be stopped by battery management than regular background work.
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
             WorkManager.getInstance(context).enqueue(request)
             queued++

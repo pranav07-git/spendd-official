@@ -5,7 +5,7 @@ import { savePin } from '../storage/secure';
 export function ConfirmPinScreen({ navigation, route }: ScreenProps<'ConfirmPin'>) {
   return (
     <PinEntry
-      title="RETYPE PIN"
+      title="Retype PIN"
       subtitle="Confirm your 4-digit access PIN"
       onBack={navigation.goBack}
       onComplete={async pin => {

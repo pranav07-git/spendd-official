@@ -6,19 +6,16 @@ import type { Budget } from '../transactions/budget';
 const KEYS = {
   setupComplete: 'spendd.setupComplete',
   consent: 'spendd.consent',
+  // Left by the removed bank statement feature; only listed so a reset clears it.
   statement: 'spendd.statement',
   budget: 'spendd.budget',
   profile: 'spendd.profile',
-  ai: 'spendd.ai',
-  aiInsights: 'spendd.aiInsights',
-};
-
-export type ImportedStatement = {
-  name: string;
-  size: number | null;
-  type: string | null;
-  localUri: string;
-  importedAt: string;
+  // The old Spendd AI on/off switch; Spendd AI is always on now. Listed so a reset clears it.
+  cloudAi: 'spendd.cloudAi',
+  cloudInsights: 'spendd.cloudInsights',
+  // Left by the old on-device model; only listed so a reset clears them.
+  legacyAi: 'spendd.ai',
+  legacyAiInsights: 'spendd.aiInsights',
 };
 
 export async function isSetupComplete(): Promise<boolean> {
@@ -34,15 +31,6 @@ export async function saveConsent(): Promise<void> {
     KEYS.consent,
     JSON.stringify({ acceptedAt: new Date().toISOString() }),
   );
-}
-
-export async function saveStatement(statement: ImportedStatement): Promise<void> {
-  await AsyncStorage.setItem(KEYS.statement, JSON.stringify(statement));
-}
-
-export async function getStatement(): Promise<ImportedStatement | null> {
-  const raw = await AsyncStorage.getItem(KEYS.statement);
-  return raw ? (JSON.parse(raw) as ImportedStatement) : null;
 }
 
 export async function getBudget(): Promise<Budget | null> {
@@ -75,32 +63,16 @@ export async function saveProfile(profile: Profile): Promise<void> {
   await AsyncStorage.setItem(KEYS.profile, JSON.stringify(profile));
 }
 
-export type AiSettings = {
-  /** The user wants AI-written insights (only matters once the model is downloaded). */
-  enabled: boolean;
-  /** The downloaded model's checksum has been verified. */
-  verified: boolean;
-};
-
-export async function getAiSettings(): Promise<AiSettings> {
-  const raw = await AsyncStorage.getItem(KEYS.ai);
-  return raw ? (JSON.parse(raw) as AiSettings) : { enabled: false, verified: false };
-}
-
-export async function saveAiSettings(settings: AiSettings): Promise<void> {
-  await AsyncStorage.setItem(KEYS.ai, JSON.stringify(settings));
-}
-
-/** The last AI-written insights, keyed by a hash of the facts they were written from. */
-export type AiInsightsCache = { hash: string; insights: Insight[]; generatedAt: number };
+/** The last AI-written insights and money stories, keyed by a hash of the facts behind them. */
+export type AiInsightsCache = { hash: string; insights: Insight[]; stories: string[]; generatedAt: number };
 
 export async function getAiInsightsCache(): Promise<AiInsightsCache | null> {
-  const raw = await AsyncStorage.getItem(KEYS.aiInsights);
+  const raw = await AsyncStorage.getItem(KEYS.cloudInsights);
   return raw ? (JSON.parse(raw) as AiInsightsCache) : null;
 }
 
 export async function saveAiInsightsCache(cache: AiInsightsCache): Promise<void> {
-  await AsyncStorage.setItem(KEYS.aiInsights, JSON.stringify(cache));
+  await AsyncStorage.setItem(KEYS.cloudInsights, JSON.stringify(cache));
 }
 
 export async function clearAppState(): Promise<void> {

@@ -1,49 +1,40 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { ArrowLeftIcon } from './Icons';
-import { colors, fonts } from '../theme';
+import { makeStyles, SCREEN_PADDING, TOUCH_TARGET, type } from '../theme';
 
 type HeaderProps = {
   title: string;
   onBack?: () => void;
-  /** Biometric screen variant: raised bar with a bottom divider. */
+  /** Kept for compatibility; all headers share one quiet style now. */
   bordered?: boolean;
 };
 
-export function Header({ title, onBack, bordered }: HeaderProps) {
+/** Back arrow and a centred title. */
+export function Header({ title, onBack }: HeaderProps) {
+  const s = useStyles();
   return (
-    <View style={[styles.bar, bordered && styles.bordered]}>
+    <View style={s.bar}>
       {onBack ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          hitSlop={12}
-          onPress={onBack}
-          style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8} onPress={onBack} style={s.back}>
           <ArrowLeftIcon />
         </Pressable>
       ) : null}
-      <Text style={[styles.title, bordered && styles.titleWide]}>{title}</Text>
+      <Text style={s.title} accessibilityRole="header" numberOfLines={1}>
+        {title}
+      </Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    height: 64,
+const useStyles = makeStyles(c => ({
+  bar: { height: 56, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 64 },
+  back: {
+    position: 'absolute',
+    left: SCREEN_PADDING - 10,
+    width: TOUCH_TARGET,
+    height: TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bordered: {
-    backgroundColor: '#0E0E0E',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-  },
-  back: { position: 'absolute', left: 18, top: 20 },
-  title: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 12,
-    letterSpacing: 2,
-    color: colors.text,
-  },
-  titleWide: { fontSize: 13, letterSpacing: 3 },
-});
+  title: { ...type.heading, color: c.ink },
+}));

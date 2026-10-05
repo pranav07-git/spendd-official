@@ -1,18 +1,17 @@
 package com.spendd.receipts
 
+import android.graphics.BitmapFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
-import org.json.JSONArray
-import org.json.JSONObject
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Runs the real on-device OCR over every image in androidTest/assets/receipts and writes what it
- * read (plus the parse) to <external files>/ocr-dump/<name>.json, so OCR output from real
- * screenshots can be turned into JVM parser fixtures.
+ * Writes what ML Kit reads from every image in androidTest/assets/receipts — each pass's raw lines,
+ * the combined lines, and the parse — to <external files>/ocr-dump/<name>.txt. Pull with
+ * `adb pull /sdcard/Android/data/com.spendd/files/ocr-dump`.
  */
 @RunWith(AndroidJUnit4::class)
 class ReceiptOcrDumpTest {
@@ -21,20 +20,22 @@ class ReceiptOcrDumpTest {
     fun dumpOcrForFixtures() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val assets = instrumentation.context.assets
-        val target = instrumentation.targetContext
-        val out = File(target.getExternalFilesDir(null), "ocr-dump").apply { deleteRecursively(); mkdirs() }
+        val out = File(instrumentation.targetContext.getExternalFilesDir(null), "ocr-dump").apply { deleteRecursively(); mkdirs() }
 
         for (name in assets.list("receipts").orEmpty()) {
-            val image = File(target.cacheDir, name)
-            assets.open("receipts/$name").use { input -> image.outputStream().use { input.copyTo(it) } }
-            val (lines, height) = runBlocking { ReceiptOcr.recognize(image) }
-            val parsed = ReceiptParser.parse(lines, height)
-            val dump = JSONObject()
-                .put("imageHeight", height)
-                .put("lines", JSONArray(lines.map { JSONObject().put("text", it.text).put("top", it.top).put("height", it.height) }))
-                .put("parsed", parsed.toString())
-            File(out, "${name.substringBeforeLast('.')}.json").writeText(dump.toString(2))
-            image.delete()
+            val bitmap = assets.open("receipts/$name").use { BitmapFactory.decodeStream(it) } ?: continue
+            val report = StringBuilder("# $name (${bitmap.width}x${bitmap.height})\n")
+            runBlocking {
+                ReceiptOcr.readPasses(bitmap).forEach { (pass, lines) ->
+                    report.append("\n## $pass\n")
+                    lines.sortedBy { it.top }.forEach { report.append("${it.top}:h${it.height} c${"%.2f".format(it.confidence)}  ${it.text}\n") }
+                }
+                val (lines, height) = ReceiptOcr.recognize(bitmap)
+                report.append("\n## combined\n")
+                lines.forEach { report.append("${it.top}:h${it.height}  ${it.text}\n") }
+                report.append("\n## parsed\n${ReceiptParser.parse(lines, height)}\n")
+            }
+            File(out, "${name.substringBeforeLast('.')}.txt").writeText(report.toString())
         }
     }
 }

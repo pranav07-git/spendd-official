@@ -7,18 +7,17 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Avatar } from '../../components/Avatar';
 import { BellIcon } from '../../components/Icons';
+import { StoryHeader } from '../../components/Layout';
 import { Screen } from '../../components/Screen';
 import { buildInsights } from '../../insights/engine';
 import type { InsightsReport, StoryItem } from '../../insights/types';
-import { useAiInsights, type AiInsights } from '../../insights/useAiInsights';
-import { useAiModel } from '../../insights/useAiModel';
+import { useCloudInsights, type AiInsights } from '../../insights/useCloudInsights';
 import type { ScreenProps } from '../../navigation/types';
 import {
   DEFAULT_PROFILE,
@@ -27,13 +26,12 @@ import {
   type Profile,
 } from '../../storage/appState';
 import type { Budget } from '../../transactions/budget';
-import { emojiFor } from '../../transactions/categories';
 import { formatRupees } from '../../transactions/format';
-import { todaysStory } from '../../transactions/stories';
+import { monthlyStory } from '../../transactions/stories';
+import { autoCategorize } from '../../transactions/autoCategorize';
 import { listTransactions } from '../../transactions/store';
-import { paymentCount } from '../../transactions/summary';
 import type { Transaction } from '../../transactions/types';
-import { colors, fonts } from '../../theme';
+import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../../theme';
 import { AccountsTab } from './AccountsTab';
 import {
   AiNote,
@@ -45,23 +43,16 @@ import {
   SectionTitle,
   StoryStrip,
 } from './HomeSections';
-import { InsightsTab } from './InsightsTab';
+import { MyMoneyTab } from './MyMoneyTab';
 import { ProfileTab } from './ProfileTab';
-import { TabBar, type TabKey } from './TabBar';
+import { TabBar, type TabKey, TAB_BAR_CLEARANCE } from './TabBar';
 import { TransactionsTab } from './TransactionsTab';
 
 /** How many insights the home feed previews; the Insights tab shows them all. */
 const HOME_INSIGHTS = 3;
 
-function greetingFor(date: Date) {
-  const hour = date.getHours();
-  if (hour < 12) {
-    return 'Good morning';
-  }
-  return hour < 17 ? 'Good afternoon' : 'Good evening';
-}
-
 function useToast() {
+  const s = useStyles();
   const [message, setMessage] = useState<string | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,10 +88,10 @@ function useToast() {
   const node = message ? (
     <Animated.View
       pointerEvents="none"
-      style={[styles.toast, { opacity }]}
+      style={[s.toast, { opacity }]}
       accessibilityLiveRegion="polite"
     >
-      <Text style={styles.toastText}>{message}</Text>
+      <Text style={s.toastText}>{message}</Text>
     </Animated.View>
   ) : null;
 
@@ -109,31 +100,27 @@ function useToast() {
 
 /** One card per story slide, in the same order the story viewer shows them. */
 function storiesFor(transactions: Transaction[]): StoryItem[] {
-  return todaysStory(transactions).map(slide => {
-    if (slide.kind === 'empty') {
-      return {
-        id: 'empty',
-        emoji: '🌱',
-        title: 'No spends yet',
-        caption: 'Nothing logged today',
-      };
+  return monthlyStory(transactions).map(slide => {
+    switch (slide.kind) {
+      case 'empty':
+        return { id: 'empty', glyph: 'Empty', title: 'No spends yet', caption: 'Nothing logged this month' };
+      case 'category':
+        return {
+          id: slide.category,
+          glyph: slide.category,
+          title: slide.category,
+          caption: `${formatRupees(slide.amount)} this month`,
+        };
+      case 'income':
+        return { id: 'income', glyph: 'Income', title: 'Income', caption: `${formatRupees(slide.total)} earned` };
+      case 'question':
+        return {
+          id: slide.tx.id,
+          glyph: 'Question',
+          title: formatRupees(slide.tx.amount),
+          caption: 'What was this for?',
+        };
     }
-    if (slide.kind === 'total') {
-      return {
-        id: 'total',
-        emoji: '💰',
-        title: formatRupees(slide.summary.total),
-        caption: `Spent today • ${paymentCount(slide.summary.count)}`,
-      };
-    }
-    return {
-      id: slide.item.category,
-      emoji: emojiFor(slide.item.category),
-      title: slide.item.category,
-      caption: `${formatRupees(slide.item.amount)} • ${paymentCount(
-        slide.item.count,
-      )}`,
-    };
   });
 }
 
@@ -152,34 +139,34 @@ function HomeFeed({
   onOpenStory: (index: number) => void;
   onSeeAllInsights: () => void;
 }) {
+  const s = useStyles();
   const top = (ai.insights ?? report.insights).slice(0, HOME_INSIGHTS);
+  const firstName = name.trim();
   return (
     <ScrollView
-      contentContainerStyle={styles.feed}
+      contentContainerStyle={s.feed}
       showsVerticalScrollIndicator={false}
     >
       <FadeIn index={0}>
-        <Text style={styles.greeting}>
-          {greetingFor(new Date())}, {name}
-        </Text>
-        <Text style={styles.subGreeting}>{report.headline}</Text>
+        <Text style={s.greeting}>{firstName ? `Hi ${firstName}` : 'Hi there'}</Text>
+        <StoryHeader story={report.headline} style={s.story} />
       </FadeIn>
 
       <FadeIn index={1}>
-        <View style={styles.firstCard}>
+        <View style={s.firstCard}>
           <DailyStatusCard status={report.dailyStatus} />
         </View>
       </FadeIn>
 
       <FadeIn index={2}>
-        <SectionTitle title="Today's Story" />
+        <SectionTitle title="This month’s story" />
         <StoryStrip items={storiesFor(transactions)} onPress={onOpenStory} />
       </FadeIn>
 
       <FadeIn index={3}>
         <SectionTitle
           title="Insights"
-          action={{ label: 'SEE ALL', onPress: onSeeAllInsights }}
+          action={{ label: 'See all', onPress: onSeeAllInsights }}
         />
         <InsightsCard items={top} />
         <AiNote thinking={ai.thinking} written={ai.insights != null} />
@@ -187,7 +174,7 @@ function HomeFeed({
 
       {report.dailyBudget ? (
         <FadeIn index={4}>
-          <View style={styles.budget}>
+          <View style={s.budget}>
             <DailyBudgetCard budget={report.dailyBudget} />
           </View>
         </FadeIn>
@@ -195,7 +182,7 @@ function HomeFeed({
 
       {report.habits.length > 0 ? (
         <FadeIn index={5}>
-          <SectionTitle title="Spending Habits" />
+          <SectionTitle title="Spending habits" />
           <HabitChips habits={report.habits} />
         </FadeIn>
       ) : null}
@@ -203,14 +190,17 @@ function HomeFeed({
   );
 }
 
-export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
+export function HomeScreen({ navigation, route }: ScreenProps<'Home'>) {
   const [tab, setTab] = useState<TabKey>('home');
+  const [txQuery, setTxQuery] = useState('');
   const [transactions, setTransactions] = useState<Transaction[] | null>(
     null,
   );
   const [budget, setBudget] = useState<Budget | null>(null);
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const toast = useToast();
+  const s = useStyles();
+  const { c } = useTheme();
 
   const reload = useCallback(async () => {
     const [txs, savedBudget, savedProfile] = await Promise.all([
@@ -221,6 +211,12 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
     setTransactions(txs);
     setBudget(savedBudget);
     setProfile(savedProfile);
+
+    // Re-file payments from what the user taught Spendd, and ask Spendd AI about new merchants.
+    // Runs in the background; the list refreshes only if something actually changed.
+    autoCategorize(txs)
+      .then(changed => (changed > 0 ? listTransactions().then(setTransactions) : undefined))
+      .catch(() => {});
   }, []);
 
   // Screenshots are logged in the background, and budget/profile are edited on
@@ -244,17 +240,22 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
     [transactions, budget],
   );
 
-  // Spendd AI: the optional on-device model rewrites the engine's facts into its own insights.
-  const aiModel = useAiModel();
-  const ai = useAiInsights(
-    report,
-    aiModel.enabled && aiModel.phase === 'ready' ? aiModel.path : null,
-  );
-
+  // Spendd AI: Gemini words the eight fixed parameters computed from these transactions.
+  const ai = useCloudInsights(transactions, report, budget);
   const openTab = (next: TabKey) => {
     setTab(next);
     reload();
   };
+
+  // Other screens (the story's Details) open a tab here, optionally with a search filled in.
+  const requested = route.params;
+  useEffect(() => {
+    if (requested?.tab) {
+      setTab(requested.tab);
+      setTxQuery(requested.query ?? '');
+      navigation.setParams({ tab: undefined, query: undefined });
+    }
+  }, [requested, navigation]);
   const openTransaction = (transaction: Transaction) =>
     navigation.navigate('TransactionDetails', { transaction });
   const addTransaction = () => navigation.navigate('AddTransaction');
@@ -285,29 +286,28 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
   return (
     <Screen>
-      {tab === 'transactions' ? null : (
-        <View style={styles.topBar}>
+      {tab === 'transactions' || tab === 'insights' ? null : (
+        <View style={s.topBar}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open profile"
             onPress={() => openTab('profile')}
-            style={({ pressed }) => pressed && styles.pressed}
+            style={({ pressed }) => [s.iconButton, pressed && s.pressed]}
           >
             <Avatar profile={profile} size={40} round />
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Notifications"
-            hitSlop={12}
             onPress={() => toast.show('You’re all caught up')}
-            style={({ pressed }) => pressed && styles.pressed}
+            style={({ pressed }) => [s.iconButton, s.bell, pressed && s.pressed]}
           >
-            <BellIcon size={24} color={colors.ink} strokeWidth={1.8} />
+            <BellIcon size={24} color={c.ink} strokeWidth={1.8} />
           </Pressable>
         </View>
       )}
 
-      <View style={styles.body}>
+      <View style={s.body}>
         {!transactions || !report ? null : tab === 'home' ? (
           <HomeFeed
             name={profile.name}
@@ -321,6 +321,8 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           />
         ) : tab === 'transactions' ? (
           <TransactionsTab
+            key={txQuery}
+            initialQuery={txQuery}
             transactions={transactions}
             onReload={reload}
             onBack={() => openTab('home')}
@@ -329,15 +331,16 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
             onToast={toast.show}
           />
         ) : tab === 'insights' ? (
-          <InsightsTab
-            report={report}
-            ai={ai}
-            aiModel={aiModel}
+          <MyMoneyTab
             transactions={transactions}
+            stories={ai.stories ?? report.insights.slice(0, 2).map(i => i.title)}
             onOpen={openTransaction}
+            onOpenStory={() => navigation.navigate('Story', { startIndex: 0 })}
+            onSearch={() => {
+              setTxQuery('');
+              openTab('transactions');
+            }}
             onAdd={addTransaction}
-            onSetBudget={setBudgetScreen}
-            onSetUpAi={() => openTab('profile')}
           />
         ) : tab === 'accounts' ? (
           <AccountsTab
@@ -351,7 +354,6 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
             profile={profile}
             transactions={transactions}
             budget={budget}
-            aiModel={aiModel}
             onEditProfile={() => navigation.navigate('EditProfile')}
             onSetBudget={setBudgetScreen}
             onChangePin={() => navigation.navigate('ChangePin')}
@@ -366,51 +368,39 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           />
         )}
         {toast.node}
+        <TabBar active={tab} onChange={next => openTab(next)} />
       </View>
-
-      <TabBar active={tab} onChange={next => openTab(next)} />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  pressed: { opacity: 0.6 },
+const useStyles = makeStyles(c => ({
+  pressed: { transform: [{ scale: 0.97 }], opacity: 0.85 },
   topBar: {
-    height: 72,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
+    paddingHorizontal: SCREEN_PADDING,
+    backgroundColor: c.bg,
   },
+  iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  bell: { borderRadius: radius.pill, marginRight: -space[2] },
   body: { flex: 1 },
-  feed: { paddingHorizontal: 20, paddingTop: 26, paddingBottom: 40 },
-  greeting: {
-    fontFamily: fonts.serif,
-    fontSize: 31,
-    lineHeight: 40,
-    color: colors.ink,
-  },
-  subGreeting: {
-    fontFamily: fonts.serifItalic,
-    fontSize: 16,
-    color: colors.inkMuted,
-    marginTop: 2,
-  },
-  firstCard: { marginTop: 26 },
-  budget: { marginTop: 24 },
+  feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[2], paddingBottom: TAB_BAR_CLEARANCE },
+  greeting: { ...type.heading, color: c.inkMuted },
+  story: { marginTop: space[1] },
+  firstCard: { marginTop: space[6] },
+  budget: { marginTop: space[6] },
   toast: {
     position: 'absolute',
     alignSelf: 'center',
-    bottom: 16,
-    backgroundColor: colors.ink,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    bottom: TAB_BAR_CLEARANCE - space[4],
+    maxWidth: '90%',
+    backgroundColor: c.ink,
+    borderRadius: radius.pill,
+    paddingHorizontal: space[5],
+    paddingVertical: space[3],
   },
-  toastText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: colors.background,
-  },
-});
+  toastText: { ...type.label, color: c.onInk },
+}));

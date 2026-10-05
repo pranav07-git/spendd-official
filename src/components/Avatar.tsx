@@ -1,12 +1,12 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { Profile } from '../storage/appState';
-import { colors, fonts } from '../theme';
+import { fontFamily, makeStyles } from '../theme';
 
-/** The user's chosen emoji, or the initial of their name. */
+/** The user's chosen emoji, or the initial of their name, on a jar colour. */
 export function Avatar({
   profile,
   size,
-  round = false,
+  round = true,
   style,
 }: {
   profile: Profile;
@@ -14,30 +14,23 @@ export function Avatar({
   round?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const s = useStyles();
   const initial = profile.name.trim().charAt(0).toUpperCase() || '₹';
-  const radius = round ? size / 2 : 0;
   return (
     <View
-      style={[
-        styles.tile,
-        { width: size, height: size, borderRadius: radius },
-        profile.avatar ? styles.emojiTile : styles.initialTile,
-        style,
-      ]}
+      style={[s.tile, { width: size, height: size, borderRadius: round ? size / 2 : size * 0.3 }, style]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
       {profile.avatar ? (
         <Text style={{ fontSize: size * 0.48 }}>{profile.avatar}</Text>
       ) : (
-        <Text style={[styles.initial, { fontSize: size * 0.46 }]}>{initial}</Text>
+        <Text style={[s.initial, { fontSize: size * 0.44 }]}>{initial}</Text>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  tile: { alignItems: 'center', justifyContent: 'center' },
-  initialTile: { backgroundColor: colors.ink },
-  emojiTile: { backgroundColor: '#262626' },
-  initial: { fontFamily: fonts.serifBold, color: '#1A1A1A' },
-});
+const useStyles = makeStyles(c => ({
+  tile: { alignItems: 'center', justifyContent: 'center', backgroundColor: c.jar.lilac },
+  initial: { fontFamily: fontFamily.displayBold, color: c.ink },
+}));

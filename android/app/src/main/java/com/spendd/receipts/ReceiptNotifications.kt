@@ -1,6 +1,7 @@
 package com.spendd.receipts
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -51,16 +52,36 @@ object ReceiptNotifications {
             setAutoCancel(true)
         }
 
+    /** Shown by the expedited worker while it runs (required for foreground execution). */
+    fun loggingNotification(context: Context): Notification {
+        ensureChannel(context)
+        return builder(context) {
+            setContentTitle("Logging transaction…")
+            setContentText("Reading your payment screenshot")
+            setProgress(0, 0, true)
+            setOngoing(true)
+        }
+    }
+
     private fun post(context: Context, id: Int, build: NotificationCompat.Builder.() -> Unit) {
         if (!canPost(context)) return
         ensureChannel(context)
+        val notification = builder(context, build)
+        try {
+            NotificationManagerCompat.from(context).notify(id, notification)
+        } catch (_: SecurityException) {
+            // Permission revoked between the check and the post; nothing to show.
+        }
+    }
+
+    private fun builder(context: Context, build: NotificationCompat.Builder.() -> Unit): Notification {
         val open = PendingIntent.getActivity(
             context,
             0,
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_spendd)
             .setColor(0xFF000000.toInt())
             .setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -69,11 +90,6 @@ object ReceiptNotifications {
             .setContentIntent(open)
             .apply(build)
             .build()
-        try {
-            NotificationManagerCompat.from(context).notify(id, notification)
-        } catch (_: SecurityException) {
-            // Permission revoked between the check and the post; nothing to show.
-        }
     }
 
     private fun ensureChannel(context: Context) {

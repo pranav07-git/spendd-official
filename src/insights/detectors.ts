@@ -1,6 +1,6 @@
 /**
  * Each detector looks for one pattern in the user's money and returns an insight (or none).
- * They only ever state facts computed from transactions, so the on-device LLM can rephrase
+ * They only ever state facts computed from transactions, so an AI can rephrase
  * and combine them without having to do any maths itself.
  */
 import type { Budget, BudgetStatus } from '../transactions/budget';

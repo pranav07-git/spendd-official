@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet } from 'react-native';
 import { PinEntry } from '../components/PinEntry';
 import { FingerprintIcon } from '../components/Icons';
 import type { ScreenProps } from '../navigation/types';
+import { useTheme } from '../theme';
 import { getProfile } from '../storage/appState';
 import { wipeAllData } from '../storage/reset';
 import {
@@ -15,6 +16,7 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 30_000;
 
 export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
+  const { c } = useTheme();
   const [biometrics, setBiometrics] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const failedAttempts = useRef(0);
@@ -85,7 +87,7 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
 
   return (
     <PinEntry
-      title="ENTER PIN"
+      title="Enter PIN"
       subtitle="Enter your 4-digit access PIN"
       greeting={name ? `Hi ${name},` : undefined}
       onComplete={checkPin}
@@ -96,7 +98,7 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
             accessibilityRole="button"
             accessibilityLabel="Unlock with biometrics"
             onPress={tryBiometrics}
-            android_ripple={{ color: '#1E1E1E' }}
+            android_ripple={{ color: c.surfaceSunken }}
             style={styles.biometricKey}>
             <FingerprintIcon size={28} />
           </Pressable>

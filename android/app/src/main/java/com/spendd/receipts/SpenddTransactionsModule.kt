@@ -7,8 +7,6 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
-import com.spendd.ai.SpenddModelsModule
-import com.spendd.specs.NativeSpenddModelsSpec
 import com.spendd.specs.NativeSpenddTransactionsSpec
 import org.json.JSONObject
 import java.util.UUID
@@ -68,12 +66,11 @@ class SpenddPackage : BaseReactPackage() {
     override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? =
         when (name) {
             NativeSpenddTransactionsSpec.NAME -> SpenddTransactionsModule(reactContext)
-            NativeSpenddModelsSpec.NAME -> SpenddModelsModule(reactContext)
             else -> null
         }
 
     override fun getReactModuleInfoProvider() = ReactModuleInfoProvider {
-        listOf(NativeSpenddTransactionsSpec.NAME, NativeSpenddModelsSpec.NAME).associateWith { name ->
+        listOf(NativeSpenddTransactionsSpec.NAME).associateWith { name ->
             ReactModuleInfo(
                 name = name,
                 className = name,

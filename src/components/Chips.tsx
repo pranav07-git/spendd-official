@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '../theme';
+import { Pressable, Text, View } from 'react-native';
+import { makeStyles, radius, space, type } from '../theme';
 
 type ChipsProps = {
   options: string[];
@@ -7,10 +7,11 @@ type ChipsProps = {
   onSelect: (option: string) => void;
 };
 
-/** Wrapping single-select pills, styled like the Transactions filter chips. */
+/** Wrapping single-select chips (DESIGN.md §5.5). */
 export function Chips({ options, selected, onSelect }: ChipsProps) {
+  const s = useStyles();
   return (
-    <View style={styles.wrap}>
+    <View style={s.wrap}>
       {options.map(option => {
         const active = option === selected;
         return (
@@ -19,8 +20,8 @@ export function Chips({ options, selected, onSelect }: ChipsProps) {
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             onPress={() => onSelect(option)}
-            style={[styles.chip, active && styles.chipActive]}>
-            <Text style={[styles.label, active && styles.labelActive]}>{option.toUpperCase()}</Text>
+            style={({ pressed }) => [s.chip, active && s.chipActive, pressed && s.pressed]}>
+            <Text style={[s.label, active && s.labelActive]}>{option}</Text>
           </Pressable>
         );
       })}
@@ -28,17 +29,19 @@ export function Chips({ options, selected, onSelect }: ChipsProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+const useStyles = makeStyles(c => ({
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   chip: {
-    height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 17,
+    minHeight: 36,
+    paddingHorizontal: space[4],
+    borderRadius: radius.s,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     justifyContent: 'center',
   },
-  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  label: { fontFamily: fonts.sansSemiBold, fontSize: 11, letterSpacing: 1.5, color: colors.inkMuted },
-  labelActive: { color: colors.background },
-});
+  chipActive: { backgroundColor: c.ink, borderColor: c.ink },
+  pressed: { transform: [{ scale: 0.97 }] },
+  label: { ...type.label, color: c.ink },
+  labelActive: { color: c.onInk },
+}));

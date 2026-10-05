@@ -1,7 +1,7 @@
 /**
  * Spendd's on-device insights engine. Everything here is a pure function of the user's
  * transactions (and budget), so it runs offline, instantly, and nothing leaves the phone.
- * Its facts are also what the optional on-device LLM (see ai.ts) rewrites in its own words.
+ * Its numbers also feed the eight fixed parameters Spendd AI words (see parameters.ts).
  *
  * - Pace: an exponentially weighted average of daily spend (half-life 7 days), so recent
  *   habits count more than old ones; its spread gives the forecast's likely range.
@@ -9,7 +9,6 @@
  * - Patterns: the detectors in detectors.ts, ranked by score.
  */
 import { budgetStatus, periodFor, type Budget } from '../transactions/budget';
-import { emojiFor } from '../transactions/categories';
 import { addDays, daysBetween, formatDayMonth, formatRupees, LONG_MONTHS, startOfDay } from '../transactions/format';
 import { summarizeSpending } from '../transactions/summary';
 import type { Transaction } from '../transactions/types';
@@ -147,7 +146,6 @@ function habitsFrom(spends: Spend[], today: number): Habit[] {
     .slice(0, 4)
     .map(([category, amount]) => ({
       id: category,
-      emoji: emojiFor(category),
       label: category,
       sharePct: Math.round((amount / total) * 100),
     }));
@@ -179,7 +177,13 @@ export function buildInsights(transactions: Transaction[], budget: Budget | null
   // Too little history for a trend: use the plain average, today included.
   const pace = historyDays >= 3 ? weightedPace(history) : mean([...history, spentToday]);
   const spread = historyDays >= 3 ? stdDev(history) : pace * 0.5;
-  const usual = historyDays >= 3 ? mean(history.slice(-30)) : null;
+  // Your usual day: the average over the days Spendd has actually been logging (at most the last 30,
+  // today excluded). Logging starts with the first payment added to the app, not the oldest payment
+  // date, so an old screenshot doesn't spread a few days of spending across weeks of empty days.
+  const loggingStart = startOfDay(Math.min(today, ...transactions.map(tx => tx.createdAt || tx.occurredAt)));
+  const usualFrom = Math.max(firstDay, loggingStart, addDays(today, -30));
+  const usualDays = daysBetween(usualFrom, today);
+  const usual = usualDays >= 3 ? totalBetween(spends, usualFrom, today) / usualDays : null;
   const confident = historyDays >= 7;
 
   const forecast = buildForecast(transactions, spends, budget, pace, spread, confident, now);
@@ -251,13 +255,28 @@ export function buildInsights(transactions: Transaction[], budget: Budget | null
     dailyStatus,
     dailyBudget: allowance ? { amount: allowance, usedFraction: Math.min(1, spentToday / allowance), basis } : null,
     habits: habitsFrom(spends, today),
-    headline:
-      changeVsUsualPct == null
-        ? 'Let’s see where your money goes.'
-        : changeVsUsualPct <= 0
-          ? 'You’re spending smarter this week.'
-          : 'Spending is running a little high this week.',
+    headline: headlineFor(forecast, changeVsUsualPct, spends.length > 0),
   };
+}
+
+/**
+ * The story sentence that opens Home (DESIGN.md §5.3): "how am I doing?" in plain words.
+ * With a budget: "₹4,200 left for 9 days. You're on track." Otherwise the week's trend, or a
+ * neutral line while there's too little data. Never shaming.
+ */
+export function headlineFor(f: Forecast, changeVsUsualPct: number | null, hasSpends: boolean): string {
+  const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
+  if (f.budget != null && f.daysLeft > 0) {
+    const left = f.budget - f.spent;
+    if (left < 0) {
+      return `${formatRupees(-left)} over budget, with ${days(f.daysLeft)} to go. Let's slow down a bit.`;
+    }
+    return `${formatRupees(left)} left for ${days(f.daysLeft)}. ${f.projected <= f.budget ? 'You’re on track.' : 'Things are a bit tight.'}`;
+  }
+  if (changeVsUsualPct != null) {
+    return changeVsUsualPct <= 0 ? 'You’re spending less than usual this week.' : 'Spending’s a little higher than usual this week.';
+  }
+  return hasSpends ? 'Add a few more spends and I’ll tell you how the week’s going.' : 'No spends yet. Share your next UPI screenshot to start.';
 }
 
 /** Lifetime numbers for the profile page. */

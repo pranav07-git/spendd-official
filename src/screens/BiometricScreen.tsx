@@ -1,39 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { Animated, Easing, Text, View } from 'react-native';
 import { PrimaryButton, TextButton } from '../components/Buttons';
 import { Header } from '../components/Header';
 import { FingerprintIcon } from '../components/Icons';
+import { Card, StoryHeader } from '../components/Layout';
 import { Screen } from '../components/Screen';
 import { USER_NAME } from '../config';
 import type { ScreenProps } from '../navigation/types';
 import { markSetupComplete } from '../storage/appState';
 import { enableBiometrics, getBiometryType } from '../storage/secure';
-import { colors, fonts } from '../theme';
-
-const BACKDROP_ROTATIONS = [-12, 8, 24, 40];
-
-function Backdrop() {
-  return (
-    <Svg width={420} height={420} viewBox="0 0 420 420" style={styles.backdrop} pointerEvents="none">
-      {BACKDROP_ROTATIONS.map(deg => (
-        <Rect
-          key={deg}
-          x={70}
-          y={70}
-          width={280}
-          height={280}
-          stroke="#1F1F1F"
-          strokeWidth={1}
-          fill="none"
-          transform={`rotate(${deg} 210 210)`}
-        />
-      ))}
-    </Svg>
-  );
-}
+import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../theme';
 
 export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
+  const s = useStyles();
+  const { c } = useTheme();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const glow = useRef(new Animated.Value(0.6)).current;
@@ -65,7 +45,7 @@ export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
       await enableBiometrics();
       await finish();
     } catch {
-      setMessage('Biometric setup didn’t complete. Try again or choose Maybe later.');
+      setMessage('Fingerprint unlock didn’t turn on. Try again, or choose Maybe later.');
     } finally {
       setBusy(false);
     }
@@ -73,85 +53,52 @@ export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
 
   return (
     <Screen>
-      <Header title="SETUP BIOMETRIC" onBack={navigation.goBack} bordered />
+      <Header title="Fingerprint unlock" onBack={navigation.goBack} />
 
-      <View style={styles.body}>
-        <Text style={styles.greeting}>Hi {USER_NAME},</Text>
-        <Text style={styles.subtitle}>
-          Choose how you secure your app{'\n'}for a faster, safer experience.
-        </Text>
+      <View style={s.body}>
+        <StoryHeader
+          story={`Hi ${USER_NAME}, open Spendd with a touch.`}
+          caption="Faster than your PIN, and just as safe. You can still use your PIN any time."
+        />
 
-        <View style={styles.stage}>
-          <Backdrop />
-          <View style={styles.tile}>
-            <Animated.View style={[StyleSheet.absoluteFill, { opacity: glow }]}>
-              <Svg width="100%" height="100%">
-                <Defs>
-                  <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-                    <Stop offset="0" stopColor={colors.glow} stopOpacity={0.35} />
-                    <Stop offset="0.45" stopColor={colors.glow} stopOpacity={0.08} />
-                    <Stop offset="1" stopColor={colors.glow} stopOpacity={0} />
-                  </RadialGradient>
-                </Defs>
-                <Rect width="100%" height="100%" fill="url(#glow)" />
-              </Svg>
-            </Animated.View>
-            <FingerprintIcon size={64} color="#FFF6E6" strokeWidth={1.6} />
-          </View>
+        <View style={s.stage}>
+          <Card style={s.tile} padded={false}>
+            <Animated.View style={[s.glow, { opacity: glow, transform: [{ scale: glow }] }]} />
+            <FingerprintIcon size={64} color={c.ink} strokeWidth={1.6} />
+          </Card>
         </View>
 
-        {message ? <Text style={styles.message}>{message}</Text> : null}
+        {message ? <Text style={s.message}>{message}</Text> : null}
       </View>
 
-      <View style={styles.actions}>
-        <PrimaryButton label="ENABLE BIOMETRICS" onPress={enable} loading={busy} style={styles.enable} />
-        <TextButton label="MAYBE LATER" color={colors.text} onPress={finish} />
-        <Text style={styles.footer}>SECURED BY SPENDD VAULT TECHNOLOGY</Text>
+      <View style={s.actions}>
+        <PrimaryButton label="Turn on fingerprint unlock" onPress={enable} loading={busy} />
+        <TextButton label="Maybe later" onPress={finish} style={s.later} />
+        <Text style={s.footer}>Your fingerprint stays on this phone. Spendd never sees it.</Text>
       </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  body: { flex: 1, alignItems: 'center', paddingTop: 56, paddingHorizontal: 24 },
-  greeting: { fontFamily: fonts.sans, fontSize: 17, color: colors.text },
-  subtitle: {
-    fontFamily: fonts.sans,
-    fontSize: 17,
-    lineHeight: 28,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  stage: { flex: 1, minHeight: 280, alignItems: 'center', justifyContent: 'center' },
-  backdrop: { position: 'absolute' },
+const useStyles = makeStyles(c => ({
+  body: { flex: 1, paddingTop: space[6], paddingHorizontal: SCREEN_PADDING },
+  stage: { flex: 1, minHeight: 240, alignItems: 'center', justifyContent: 'center' },
   tile: {
     width: 180,
     height: 180,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    backgroundColor: '#0A0A0A',
+    borderRadius: radius.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
-  message: {
-    fontFamily: fonts.sans,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.danger,
-    textAlign: 'center',
-    marginBottom: 12,
+  glow: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: radius.pill,
+    backgroundColor: c.marigoldSoft,
   },
-  actions: { paddingHorizontal: 20, paddingBottom: 16 },
-  enable: { minHeight: 56 },
-  footer: {
-    fontFamily: fonts.sans,
-    fontSize: 9,
-    letterSpacing: 0.4,
-    color: '#555555',
-    textAlign: 'center',
-    marginTop: 28,
-  },
-});
+  message: { ...type.caption, color: c.low, textAlign: 'center', marginBottom: space[3] },
+  actions: { paddingHorizontal: SCREEN_PADDING, paddingBottom: space[4] },
+  later: { marginTop: space[2] },
+  footer: { ...type.caption, color: c.inkMuted, textAlign: 'center', marginTop: space[4] },
+}));
