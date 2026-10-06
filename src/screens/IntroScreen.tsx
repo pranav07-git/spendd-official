@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, View, type DimensionValue } from 'react-native';
-import { PrimaryButton } from '../components/Buttons';
+import { PrimaryButton, OutlineButton } from '../components/Buttons';
 import { ProgressBars } from '../components/ProgressBars';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
@@ -68,7 +68,17 @@ export function IntroScreen({ navigation }: ScreenProps<'Intro'>) {
         </View>
 
         <View style={styles.spacer} />
-        <PrimaryButton label="NEXT" withArrow onPress={() => navigation.navigate('Statement')} />
+        <View style={styles.authButtons}>
+          <PrimaryButton
+            label="CREATE ACCOUNT"
+            withArrow
+            onPress={() => navigation.navigate('SignUp')}
+          />
+          <OutlineButton
+            label="SIGN IN"
+            onPress={() => navigation.navigate('Login')}
+          />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -119,4 +129,5 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   spacer: { flexGrow: 1, minHeight: 40 },
+  authButtons: { gap: 12 },
 });

@@ -10,6 +10,9 @@ export type PickedStatement = {
 
 export type RootStackParamList = {
   Intro: undefined;
+  Login: undefined;
+  SignUp: undefined;
+  ForgotPassword: undefined;
   Statement: undefined;
   Consent: { statement: PickedStatement | null };
   CreatePin: undefined;
