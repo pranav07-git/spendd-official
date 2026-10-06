@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, ScrollView, Text, View, type DimensionValue } from 'react-native';
-import { PrimaryButton } from '../components/Buttons';
+import { PrimaryButton, OutlineButton } from '../components/Buttons';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
 import { makeStyles, radius, SCREEN_PADDING, SECTION_GAP, space, type, type Palette } from '../theme';
@@ -58,7 +58,10 @@ export function IntroScreen({ navigation }: ScreenProps<'Intro'>) {
         </View>
 
         <View style={s.spacer} />
-        <PrimaryButton label="Next" onPress={() => navigation.navigate('Consent')} />
+        <View style={s.authButtons}>
+          <PrimaryButton label="Create account" onPress={() => navigation.navigate('SignUp')} />
+          <OutlineButton label="Sign in" onPress={() => navigation.navigate('Login')} />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -86,4 +89,5 @@ const useStyles = makeStyles(c => ({
   cardLabel: { ...type.label, color: c.ink, marginBottom: space[2] },
   cardQuote: { ...type.title, color: c.ink },
   spacer: { flexGrow: 1, minHeight: space[10] },
+  authButtons: { gap: space[3] },
 }));
