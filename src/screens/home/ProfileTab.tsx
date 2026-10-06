@@ -14,6 +14,7 @@ import { transactionsToCsv } from '../../transactions/csv';
 import { formatDate, formatRupees } from '../../transactions/format';
 import { clearTransactions } from '../../transactions/store';
 import type { Transaction } from '../../transactions/types';
+import { signOut } from '../../auth/firebase';
 import {
   makeStyles,
   SCREEN_PADDING,
@@ -291,6 +292,24 @@ export function ProfileTab({
             }
           />
           <Row label="Lock app now" onPress={onLock} />
+          <Row
+            label="Sign out"
+            danger
+            onPress={() =>
+              Alert.alert(
+                'Sign out?',
+                "You'll need to sign in again to access Spendd. Your local data stays on this phone.",
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Sign out',
+                    style: 'destructive',
+                    onPress: () => signOut().catch(() => {}),
+                  },
+                ],
+              )
+            }
+          />
         </Card>
 
         <SectionHeading title="Your data" />

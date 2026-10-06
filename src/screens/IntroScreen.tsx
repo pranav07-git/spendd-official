@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, ScrollView, Text, View } from 'react-native';
-import { PrimaryButton } from '../components/Buttons';
+import { OutlineButton, PrimaryButton } from '../components/Buttons';
 import { Screen } from '../components/Screen';
 import { Spotlight } from '../components/Spotlight';
 import type { ScreenProps } from '../navigation/types';
@@ -63,7 +63,10 @@ export function IntroScreen({ navigation }: ScreenProps<'Intro'>) {
         </View>
 
         <View style={s.spacer} />
-        <PrimaryButton label="Next" onPress={() => navigation.navigate('Consent')} />
+        <View style={s.authButtons}>
+          <PrimaryButton label="Create account" onPress={() => navigation.navigate('SignUp')} />
+          <OutlineButton label="Sign in" onPress={() => navigation.navigate('Login')} />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -82,4 +85,5 @@ const useStyles = makeStyles(c => ({
   onSpotlight: { color: 'rgba(255,255,255,0.75)' },
   spotlightQuote: { ...type.subhead, fontFamily: type.title.fontFamily, fontSize: 22, lineHeight: 27, letterSpacing: -0.6 },
   spacer: { flexGrow: 1, minHeight: space[10] },
+  authButtons: { gap: space[3] },
 }));
