@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import {
+  createNavigationContainerRef,
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+  type Theme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './src/navigation/types';
 import { AddTransactionScreen } from './src/screens/AddTransactionScreen';
@@ -13,6 +19,7 @@ import { CreatePinScreen } from './src/screens/CreatePinScreen';
 import { EditProfileScreen } from './src/screens/EditProfileScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
 import { IntroScreen } from './src/screens/IntroScreen';
+import { LegalScreen } from './src/screens/LegalScreen';
 import { SetBudgetScreen } from './src/screens/SetBudgetScreen';
 import { StoryScreen } from './src/screens/StoryScreen';
 import { TransactionDetailsScreen } from './src/screens/TransactionDetailsScreen';
@@ -22,6 +29,42 @@ import { clearSecureData, hasPin } from './src/storage/secure';
 import { ThemeProvider, useTheme } from './src/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+/** Back in Spendd after longer than this away, and it asks for the PIN again. */
+const RELOCK_AFTER_MS = 30_000;
+/** Screens shown before there is a PIN to ask for, and the lock screen itself. */
+const UNLOCKED_ROUTES: (keyof RootStackParamList)[] = ['Intro', 'Consent', 'CreatePin', 'ConfirmPin', 'Biometric', 'Unlock'];
+
+/** Locks Spendd again when it comes back after a while in the background. */
+function useRelock() {
+  const leftAt = useRef<number | null>(null);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background') {
+        leftAt.current = Date.now();
+        return;
+      }
+      if (state !== 'active' || leftAt.current == null) {
+        return;
+      }
+      const away = Date.now() - leftAt.current;
+      leftAt.current = null;
+      const route = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
+      if (away < RELOCK_AFTER_MS || !route || UNLOCKED_ROUTES.includes(route)) {
+        return;
+      }
+      hasPin()
+        .then(locked => {
+          if (locked) {
+            navigationRef.reset({ index: 0, routes: [{ name: 'Unlock' }] });
+          }
+        })
+        .catch(() => {});
+    });
+    return () => sub.remove();
+  }, []);
+}
 
 
 async function resolveInitialRoute(): Promise<keyof RootStackParamList> {
@@ -47,6 +90,7 @@ function AppRoot() {
     },
   };
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
+  useRelock();
 
   useEffect(() => {
     resolveInitialRoute()
@@ -58,7 +102,7 @@ function AppRoot() {
     <SafeAreaProvider>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       {initialRoute ? (
-        <NavigationContainer theme={navTheme}>
+        <NavigationContainer ref={navigationRef} theme={navTheme}>
           <Stack.Navigator
             initialRouteName={initialRoute}
             screenOptions={{
@@ -79,6 +123,7 @@ function AppRoot() {
             <Stack.Screen name="SetBudget" component={SetBudgetScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="ChangePin" component={ChangePinScreen} />
+            <Stack.Screen name="Legal" component={LegalScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       ) : (

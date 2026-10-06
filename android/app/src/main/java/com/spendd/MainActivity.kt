@@ -1,6 +1,7 @@
 package com.spendd
 
 import android.os.Bundle
+import android.view.WindowManager
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -20,6 +21,11 @@ class MainActivity : ReactActivity() {
    */
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
+    // Spending is private: keep it out of the Recents thumbnail, screenshots and screen recordings.
+    // Debug builds leave it off so screens can be captured while developing.
+    if (!BuildConfig.DEBUG) {
+      window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+    }
   }
 
   /**

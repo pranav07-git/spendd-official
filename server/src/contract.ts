@@ -42,7 +42,9 @@ const str = (v: unknown, max: number, what: string): string => {
   if (typeof v !== 'string' || v.length === 0 || v.length > max) {
     throw new BadRequest(`${what} must be a string of 1–${max} characters`);
   }
-  return v;
+  // Summaries can carry OCR'd merchant names; line breaks and control characters would only help
+  // such text pose as instructions in the prompt.
+  return v.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ');
 };
 
 /** Strict validation: anything unexpected is rejected rather than forwarded to the model. */

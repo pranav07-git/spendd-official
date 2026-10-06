@@ -37,3 +37,8 @@ it('quotes fields with commas, quotes or newlines', () => {
   const [, row] = transactionsToCsv([tx({ counterparty: 'Rao, Sons', note: 'said "thanks"\nlater' })]).split(/\n(?=2026)/);
   expect(row).toBe('2026-10-05,09:07,Money out,250,Medical,"Rao, Sons",Cash,"said ""thanks""\nlater",,');
 });
+
+it('stops spreadsheet formulas in text from running', () => {
+  const [, row] = transactionsToCsv([tx({ counterparty: '=HYPERLINK("http://x","Pay")', note: '@SUM(A1)' })]).split('\n');
+  expect(row).toBe('2026-10-05,09:07,Money out,250,Medical,"\'=HYPERLINK(""http://x"",""Pay"")",Cash,\'@SUM(A1),,');
+});

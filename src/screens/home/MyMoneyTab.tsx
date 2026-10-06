@@ -10,6 +10,7 @@ import {
   ChevronLeftIcon,
   SearchIcon,
 } from '../../components/Icons';
+import { Spotlight } from '../../components/Spotlight';
 import { Card, SectionHeading, StoryHeader } from '../../components/Layout';
 import { buildMyMoney, comparisonLine, DISCRETIONARY, MICRO_LIMIT, type CategoryChange, type MyMoney } from '../../insights/myMoney';
 import { monthStart } from '../../insights/stats';
@@ -173,23 +174,24 @@ export function MyMoneyTab({ transactions, stories, onOpen, onOpenStory, onSearc
           />
 
           <SectionHeading title="Monthly summary" />
-          <Card>
-            <Text style={s.smallLabel}>Income</Text>
-            <Text style={s.income} numberOfLines={1} adjustsFontSizeToFit>
+          {/* My Money's one gradient spotlight (docs/DESIGN.md); everything on it is white. */}
+          <Spotlight tone="magenta">
+            <Text style={[s.smallLabel, s.onSpotlightMuted]}>Income</Text>
+            <Text style={[s.income, s.onSpotlight]} numberOfLines={1} adjustsFontSizeToFit>
               {formatRupees(m.income)}
             </Text>
-            <View style={s.rule} />
+            <View style={[s.rule, s.onSpotlightRule]} />
             <View style={s.split}>
               <View style={s.splitItem}>
-                <Text style={s.smallLabel}>Spent</Text>
-                <Text style={s.splitValue}>{formatRupees(m.spending)}</Text>
+                <Text style={[s.smallLabel, s.onSpotlightMuted]}>Spent</Text>
+                <Text style={[s.splitValue, s.onSpotlight]}>{formatRupees(m.spending)}</Text>
               </View>
               <View style={s.splitItem}>
-                <Text style={s.smallLabel}>{m.savings < 0 ? 'Over by' : 'Kept'}</Text>
-                <Text style={[s.splitValue, m.savings > 0 && s.positive]}>{formatRupees(Math.abs(m.savings))}</Text>
+                <Text style={[s.smallLabel, s.onSpotlightMuted]}>{m.savings < 0 ? 'Over by' : 'Kept'}</Text>
+                <Text style={[s.splitValue, s.onSpotlight]}>{formatRupees(Math.abs(m.savings))}</Text>
               </View>
             </View>
-          </Card>
+          </Spotlight>
           {!m.hasData && month === thisMonth ? <OutlineButton label="Add a spend" onPress={onAdd} style={s.emptyButton} /> : null}
         </FadeIn>
 
@@ -386,7 +388,10 @@ const useStyles = makeStyles(c => ({
   iconButton: { width: TOUCH_TARGET, height: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' },
   feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: TAB_BAR_CLEARANCE },
   caption: { ...type.caption, color: c.inkMuted },
-  smallLabel: { ...type.label, color: c.inkMuted },
+  smallLabel: { ...type.eyebrow, color: c.inkMuted },
+  onSpotlight: { color: '#FFFFFF' },
+  onSpotlightMuted: { color: 'rgba(255,255,255,0.75)' },
+  onSpotlightRule: { backgroundColor: 'rgba(255,255,255,0.25)' },
   cardTitle: { ...type.heading, color: c.ink },
   placeholder: { ...type.body, color: c.inkMuted },
   divider: { borderTopWidth: 1, borderTopColor: c.line },
@@ -457,7 +462,7 @@ const useStyles = makeStyles(c => ({
   scoreVerdict: { ...type.caption, color: c.inkMuted, flexShrink: 1, textAlign: 'right' },
   scoreTrack: { height: 6, borderRadius: radius.pill, backgroundColor: c.surfaceSunken, marginTop: space[1], overflow: 'hidden' },
   scoreFill: { height: '100%', borderRadius: radius.pill, backgroundColor: c.peacock },
-  howLink: { ...type.caption, fontFamily: type.label.fontFamily, color: c.ink, marginTop: space[3], textDecorationLine: 'underline' },
+  howLink: { ...type.caption, color: c.info, marginTop: space[3] },
   microAmount: { ...type.amountMedium, color: c.ink, marginTop: space[1] },
   opportunity: { backgroundColor: c.peacockSoft, borderRadius: radius.l, padding: space[4] },
   opportunityLabel: { ...type.label, color: c.ink },

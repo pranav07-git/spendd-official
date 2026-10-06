@@ -2,7 +2,7 @@ import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { Profile } from '../storage/appState';
 import { fontFamily, makeStyles } from '../theme';
 
-/** The user's chosen emoji, or the initial of their name, on a jar colour. */
+/** The user's chosen emoji, or the initial of their name, in a charcoal circle. */
 export function Avatar({
   profile,
   size,
@@ -31,6 +31,6 @@ export function Avatar({
 }
 
 const useStyles = makeStyles(c => ({
-  tile: { alignItems: 'center', justifyContent: 'center', backgroundColor: c.jar.lilac },
+  tile: { alignItems: 'center', justifyContent: 'center', backgroundColor: c.surfaceSunken },
   initial: { fontFamily: fontFamily.displayBold, color: c.ink },
 }));

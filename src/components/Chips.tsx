@@ -7,7 +7,7 @@ type ChipsProps = {
   onSelect: (option: string) => void;
 };
 
-/** Wrapping single-select chips (DESIGN.md §5.5). */
+/** Wrapping single-select chips (docs/DESIGN.md). */
 export function Chips({ options, selected, onSelect }: ChipsProps) {
   const s = useStyles();
   return (
@@ -34,14 +34,12 @@ const useStyles = makeStyles(c => ({
   chip: {
     minHeight: 36,
     paddingHorizontal: space[4],
-    borderRadius: radius.s,
-    borderWidth: 1,
-    borderColor: c.line,
+    borderRadius: radius.pill,
     backgroundColor: c.surface,
     justifyContent: 'center',
   },
-  chipActive: { backgroundColor: c.ink, borderColor: c.ink },
-  pressed: { transform: [{ scale: 0.97 }] },
-  label: { ...type.label, color: c.ink },
+  chipActive: { backgroundColor: c.ink },
+  pressed: { opacity: 0.7 },
+  label: { ...type.label, color: c.inkMuted },
   labelActive: { color: c.onInk },
 }));

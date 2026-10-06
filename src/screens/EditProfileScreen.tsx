@@ -100,7 +100,7 @@ const useStyles = makeStyles(c => ({
   content: { paddingHorizontal: SCREEN_PADDING, paddingBottom: SECTION_GAP },
   preview: { alignSelf: 'center', marginTop: space[4], marginBottom: SECTION_GAP },
   card: { gap: space[3], marginBottom: space[3] },
-  label: { ...type.label, color: c.inkMuted },
+  label: { ...type.eyebrow, color: c.inkMuted },
   input: {
     ...type.body,
     color: c.ink,

@@ -409,7 +409,7 @@ const useStyles = makeStyles((c, isDark) => ({
     marginBottom: space[4],
   },
   glyphIncome: { backgroundColor: c.peacockSoft },
-  eyebrow: { ...type.label, color: c.inkMuted },
+  eyebrow: { ...type.eyebrow, color: c.inkMuted },
   storyWord: { ...type.story, color: c.ink, marginTop: space[1], textAlign: 'center' },
   body: { ...type.body, color: c.inkMuted, textAlign: 'center' },
   bodyGap: { marginTop: space[6] },

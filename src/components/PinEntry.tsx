@@ -6,7 +6,7 @@ import { AccountIcon, BackspaceIcon } from './Icons';
 import { Screen } from './Screen';
 import { TextButton } from './Buttons';
 import { PIN_LENGTH, USER_NAME } from '../config';
-import { fontFamily, makeStyles, radius, space, type, useTheme } from '../theme';
+import { fontFamily, makeStyles, space, type, useTheme } from '../theme';
 
 type PinEntryProps = {
   title: string;
@@ -19,6 +19,8 @@ type PinEntryProps = {
   bottomLeftKey?: ReactNode;
   greeting?: string;
 };
+
+const KEY_SIZE = 76;
 
 const KEYS = [
   ['1', '2', '3'],
@@ -165,30 +167,31 @@ const useStyles = makeStyles(c => ({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: c.jar.lilac,
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: space[4],
   },
-  greeting: { ...type.title, color: c.ink, marginBottom: space[1] },
+  greeting: { ...type.title, color: c.ink, marginBottom: space[2] },
   subtitle: { ...type.body, color: c.inkMuted, textAlign: 'center' },
-  error: { color: c.low },
+  error: { color: c.ink },
   slots: { flexDirection: 'row', justifyContent: 'center', gap: space[4], marginTop: space[6], marginBottom: space[6] },
-  dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: c.inkSubtle },
-  dotFilled: { backgroundColor: c.ink, borderColor: c.ink },
-  dotError: { borderColor: c.low },
-  keypad: { flex: 1, maxHeight: 440, paddingHorizontal: space[6], gap: space[3] },
-  row: { flex: 1, flexDirection: 'row', gap: space[3] },
+  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: c.surfaceSunken },
+  dotFilled: { backgroundColor: c.ink },
+  dotError: { backgroundColor: c.info },
+  keypad: { flex: 1, maxHeight: 420, paddingHorizontal: space[8], justifyContent: 'space-evenly' },
+  row: { flexDirection: 'row', justifyContent: 'space-between' },
+  // Circular charcoal keys (docs/DESIGN.md button-icon-circular, sized for thumbs).
   key: {
-    flex: 1,
-    minHeight: 56,
-    borderRadius: radius.l,
+    width: KEY_SIZE,
+    height: KEY_SIZE,
+    borderRadius: KEY_SIZE / 2,
     backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   keyBlank: { backgroundColor: 'transparent' },
-  keyPressed: { backgroundColor: c.surfaceSunken, transform: [{ scale: 0.97 }] },
-  digit: { fontFamily: fontFamily.display, fontSize: 28, color: c.ink, fontVariant: ['tabular-nums'] },
+  keyPressed: { backgroundColor: c.surfaceSunken, transform: [{ scale: 0.96 }] },
+  digit: { fontFamily: fontFamily.display, fontSize: 28, letterSpacing: -0.6, color: c.ink, fontVariant: ['tabular-nums'] },
   forgot: { marginVertical: space[3] },
 }));

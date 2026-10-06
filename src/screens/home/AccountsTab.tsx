@@ -138,7 +138,7 @@ const useStyles = makeStyles(c => ({
   firstCard: { marginTop: space[6] },
 
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -space[3] },
-  cardLabel: { ...type.label, color: c.inkMuted },
+  cardLabel: { ...type.eyebrow, color: c.inkMuted },
   edit: { alignSelf: 'auto', paddingHorizontal: space[2], marginRight: -space[2] },
   amountRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: space[2], marginTop: space[1] },
   heroAmount: { ...type.amountHero, color: c.ink },

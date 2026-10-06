@@ -260,7 +260,7 @@ export function buildInsights(transactions: Transaction[], budget: Budget | null
 }
 
 /**
- * The story sentence that opens Home (DESIGN.md §5.3): "how am I doing?" in plain words.
+ * The story sentence that opens Home (docs/DESIGN.md): "how am I doing?" in plain words.
  * With a budget: "₹4,200 left for 9 days. You're on track." Otherwise the week's trend, or a
  * neutral line while there's too little data. Never shaming.
  */

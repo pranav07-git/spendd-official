@@ -4,9 +4,16 @@ const HEADER = ['Date', 'Time', 'Type', 'Amount (INR)', 'Category', 'Paid to / f
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** Quotes a field when it holds a comma, quote or newline (RFC 4180). */
+/**
+ * Quotes a field when it holds a comma, quote or newline (RFC 4180). Text starting with = + - @ or a
+ * tab/CR gets a leading ' so a spreadsheet shows it instead of running it as a formula: payee names
+ * come from screenshots, so "=HYPERLINK(…)" is something anyone could put in front of the camera.
+ */
 function cell(value: string | number | null | undefined): string {
-  const text = value == null ? '' : String(value);
+  let text = value == null ? '' : String(value);
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) {
+    text = `'${text}`;
+  }
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

@@ -22,7 +22,7 @@ Home (5 tabs, floating rounded tab bar; the active tab is shown by a bolder icon
 ├─ Transactions  every payment, search, filters, add
 ├─ Home          today's status, the month's story, insights
 ├─ My Money      monthly summary and analysis
-└─ Profile       you, Spendd AI, security, appearance, data
+└─ Profile       you, Spendd AI, security, data
 
 Full screens opened from the tabs
 Story · Transaction details · Add a payment · Set budget · Edit profile · Change PIN
@@ -40,7 +40,7 @@ First-run flow, from opening the app to the Home screen.
 | Screen | Purpose |
 |---|---|
 | **Intro** | Shows what Spendd does with three example insight cards. |
-| **Consent** | What Spendd uses and never uses, how Spendd AI works, and the agreement checkbox. "Allow and continue" or "Not now". |
+| **Consent** | What Spendd uses and never uses, how Spendd AI works, and the agreement checkbox, whose Privacy Policy and Terms of Use links open in-app pages. "Allow and continue" is the only way forward. |
 
 Code: `src/screens/IntroScreen.tsx`, `ConsentScreen.tsx`
 
@@ -179,7 +179,6 @@ Code: `src/insights/{parameters,cloud,useCloudInsights}.ts`, `server/` (see `ser
 | **Budget** | The current budget; opens Set budget. |
 | **Spendd AI** | What's sent and how learning works. |
 | **Security** | Change PIN, biometric unlock, lock app now. |
-| **Appearance** | Theme: System, Light, or Dark (black and white glass). |
 | **Your data** | Export transactions (CSV via Share), clear all transactions, reset Spendd. |
 
 Code: `src/screens/home/ProfileTab.tsx`, `EditProfileScreen.tsx`
@@ -190,7 +189,7 @@ Code: `src/screens/home/ProfileTab.tsx`, `EditProfileScreen.tsx`
 
 | Part | Where |
 |---|---|
-| Design system: light, dark glass, tokens | `src/theme/`, `src/components/` |
+| Design system: dark artboard, Inter, white pills, gradient spotlights (docs/DESIGN.md) | `src/theme/`, `src/components/` |
 | Transaction store (on the phone, private JSON) | `android/.../receipts/TransactionStore.kt`, `src/transactions/store.ts` |
 | Built-in insights engine (~25 detectors) | `src/insights/engine.ts`, `detectors.ts` |
 | Insights and categorization server (Node + Gemini) | `server/` |

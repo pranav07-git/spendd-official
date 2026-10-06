@@ -58,12 +58,12 @@ object ReceiptOcr {
     private const val MISREAD_RUPEE_CONFIDENCE = 0.35f
     private const val MIN_CONFIDENCE = 0.4f
     private const val MAX_HEIGHT = 2800
+    /** 200 megapixels: far beyond any screenshot, and refused before decoding. */
+    private const val MAX_PIXELS = 200_000_000L
     private const val TAG = "receipt-ocr"
 
     suspend fun recognize(file: File): Pair<List<OcrLine>, Int> {
-        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-            ?: throw IllegalArgumentException("Not an image")
-        return recognize(fit(bitmap))
+        return recognize(fit(decodeSampled(file)))
     }
 
     suspend fun recognize(bitmap: Bitmap): Pair<List<OcrLine>, Int> {
@@ -183,6 +183,23 @@ object ReceiptOcr {
     // ---- image passes -------------------------------------------------------------------------
 
     /** Phone screenshots are ~2400px tall; anything far larger only slows OCR down. */
+    /**
+     * Decodes at most about twice [MAX_HEIGHT] tall: the header is read first, so an image that
+     * declares huge dimensions (a decompression bomb) is downsampled or refused instead of
+     * allocating gigabytes.
+     */
+    private fun decodeSampled(file: File): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        val (width, height) = bounds.outWidth to bounds.outHeight
+        if (width <= 0 || height <= 0) throw IllegalArgumentException("Not an image")
+        if (width.toLong() * height > MAX_PIXELS) throw IllegalArgumentException("Image too large")
+        var sample = 1
+        while (height / (sample * 2) >= MAX_HEIGHT) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        return BitmapFactory.decodeFile(file.absolutePath, options) ?: throw IllegalArgumentException("Not an image")
+    }
+
     private fun fit(bitmap: Bitmap): Bitmap =
         if (bitmap.height > MAX_HEIGHT) {
             Bitmap.createScaledBitmap(bitmap, bitmap.width * MAX_HEIGHT / bitmap.height, MAX_HEIGHT, true)

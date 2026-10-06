@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
-import { PrimaryButton, TextButton } from '../components/Buttons';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { PrimaryButton } from '../components/Buttons';
 import {
   BotIcon,
   ChartIcon,
@@ -13,7 +13,6 @@ import {
 } from '../components/Icons';
 import { Card, PrivacyBadge, StoryHeader } from '../components/Layout';
 import { Screen } from '../components/Screen';
-import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../config';
 import type { ScreenProps } from '../navigation/types';
 import { saveConsent } from '../storage/appState';
 import { makeStyles, radius, SCREEN_PADDING, SECTION_GAP, space, type, TOUCH_TARGET, useTheme } from '../theme';
@@ -22,8 +21,8 @@ const ACCESSED: { title: string; detail?: string }[] = [
   { title: 'Payment screenshots you share with Spendd' },
   { title: 'Spends you add yourself' },
   {
-    title: 'Spendd AI, if it’s on',
-    detail: 'Your monthly totals and the names or UPI IDs of businesses you paid. On by default; turn it off in Profile.',
+    title: 'Spendd',
+    detail: 'Your monthly totals, and the names and UPI IDs of businesses you paid.',
   },
 ];
 const NOT_ACCESSED = ['Your messages', 'Your photo gallery', 'Your contacts'];
@@ -44,8 +43,8 @@ const PRINCIPLES: Principle[] = [
   },
   {
     icon: color => <BotIcon color={color} />,
-    title: 'Spendd AI',
-    body: 'When it’s on, Spendd sends your monthly totals and the names or UPI IDs of businesses you paid to our server. It uses Google Gemini to write your insights and sort new shops into categories. It never gets your screenshots, your transaction list, or anything about people you pay. Turn it off any time in Profile.',
+    title: 'Spendd',
+    body: 'Spendd sends your monthly totals, and the names and UPI IDs of businesses you paid, to our server. It uses Google Gemini to write your insights and sort new shops into categories. It never gets your screenshots, your transaction list, or anything about people you pay.',
   },
   {
     icon: color => <ChartIcon color={color} />,
@@ -58,12 +57,6 @@ const PRINCIPLES: Principle[] = [
     body: 'Delete your data or take back your consent any time.',
   },
 ];
-
-function openLink(url: string) {
-  if (url) {
-    Linking.openURL(url);
-  }
-}
 
 export function ConsentScreen({ navigation }: ScreenProps<'Consent'>) {
   const s = useStyles();
@@ -105,7 +98,7 @@ export function ConsentScreen({ navigation }: ScreenProps<'Consent'>) {
           {ACCESSED.map(item => (
             <View key={item.title} style={s.listRow}>
               <View style={s.listIcon}>
-                <CheckboxCheckedIcon size={20} />
+                <CheckboxCheckedIcon size={20} color={c.success} />
               </View>
               <View style={s.listTextWrap}>
                 <Text style={s.listText}>{item.title}</Text>
@@ -162,16 +155,16 @@ export function ConsentScreen({ navigation }: ScreenProps<'Consent'>) {
           onPress={() => setAgreed(a => !a)}
           style={s.agreeRow}>
           <View style={s.agreeBox}>
-            {agreed ? <CheckboxCheckedIcon size={22} /> : <CheckboxEmptyIcon size={22} color={c.inkMuted} />}
+            {agreed ? <CheckboxCheckedIcon size={22} color={c.info} /> : <CheckboxEmptyIcon size={22} color={c.inkMuted} />}
           </View>
           <Text style={s.agreeText}>
             I agree to the{' '}
-            <Text style={s.link} onPress={() => openLink(PRIVACY_POLICY_URL)}>
+            <Text style={s.link} onPress={() => navigation.navigate('Legal', { doc: 'privacy' })}>
               Privacy Policy
             </Text>{' '}
             and{' '}
-            <Text style={s.link} onPress={() => openLink(TERMS_OF_SERVICE_URL)}>
-              Terms of Service
+            <Text style={s.link} onPress={() => navigation.navigate('Legal', { doc: 'terms' })}>
+              Terms of Use
             </Text>
             , and I'm happy for Spendd to organise my spending data.
           </Text>
@@ -186,7 +179,6 @@ export function ConsentScreen({ navigation }: ScreenProps<'Consent'>) {
           onPress={allowAndContinue}
           style={s.allow}
         />
-        <TextButton label="Not now" onPress={() => navigation.navigate('CreatePin')} style={s.notNow} />
       </ScrollView>
     </Screen>
   );
@@ -221,8 +213,7 @@ const useStyles = makeStyles(c => ({
   agreeRow: { flexDirection: 'row', gap: space[3], marginTop: SECTION_GAP, minHeight: TOUCH_TARGET },
   agreeBox: { paddingTop: 1 },
   agreeText: { ...type.body, color: c.inkMuted, flex: 1 },
-  link: { ...type.bodyStrong, color: c.ink, textDecorationLine: 'underline' },
+  link: { ...type.bodyStrong, color: c.info },
   error: { ...type.caption, color: c.low, marginTop: space[4] },
-  allow: { marginTop: space[6] },
-  notNow: { marginTop: space[2] },
+  allow: { marginTop: space[6], marginBottom: space[4] },
 }));

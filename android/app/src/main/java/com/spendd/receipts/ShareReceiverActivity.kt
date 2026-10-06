@@ -20,15 +20,20 @@ class ShareReceiverActivity : Activity() {
         val uris = sharedImages(intent)
         // getReferrer() is "android-app://<package>" for the app that started the share.
         val sourceApp = SourceApps.labelFor(this, referrer?.host)
-        val queued = if (uris.isEmpty()) 0 else ReceiptIntake.submit(this, uris, sourceApp)
-
-        when {
-            queued == 0 -> Toast.makeText(this, "Spendd couldn’t open that image", Toast.LENGTH_SHORT).show()
-            // With notifications off, still acknowledge the share.
-            !ReceiptNotifications.canPost(this) ->
-                Toast.makeText(this, "Logging transaction in Spendd…", Toast.LENGTH_SHORT).show()
-        }
-        finish()
+        // Copy off the main thread (a slow or huge stream mustn't freeze the share), but before
+        // finishing: read access to the shared URIs ends with this activity.
+        Thread {
+            val queued = if (uris.isEmpty()) 0 else ReceiptIntake.submit(applicationContext, uris, sourceApp)
+            runOnUiThread {
+                when {
+                    queued == 0 -> Toast.makeText(this, "Spendd couldn’t open that image", Toast.LENGTH_SHORT).show()
+                    // With notifications off, still acknowledge the share.
+                    !ReceiptNotifications.canPost(this) ->
+                        Toast.makeText(this, "Logging transaction in Spendd…", Toast.LENGTH_SHORT).show()
+                }
+                finish()
+            }
+        }.start()
     }
 
     private fun sharedImages(intent: Intent): List<Uri> {

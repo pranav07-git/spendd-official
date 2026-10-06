@@ -192,7 +192,7 @@ const useStyles = makeStyles(c => ({
   amountInput: { minWidth: 40, paddingVertical: 0, marginLeft: space[1] },
   card: { gap: space[3], marginBottom: space[3] },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TOUCH_TARGET, gap: space[4] },
-  label: { ...type.label, color: c.inkMuted },
+  label: { ...type.eyebrow, color: c.inkMuted },
   input: {
     ...type.body,
     color: c.ink,

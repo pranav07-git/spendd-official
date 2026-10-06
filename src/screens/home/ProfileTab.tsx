@@ -3,7 +3,6 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Switch, Text, V
 import { useFocusEffect } from '@react-navigation/native';
 import { Avatar } from '../../components/Avatar';
 import { TextButton } from '../../components/Buttons';
-import { Chips } from '../../components/Chips';
 import { ChevronForwardIcon } from '../../components/Icons';
 import { Card, PrivacyBadge, SectionHeading } from '../../components/Layout';
 import { lifetimeStats } from '../../insights/engine';
@@ -23,7 +22,6 @@ import {
   type,
   useTheme,
   type Palette,
-  type ThemePreference,
 } from '../../theme';
 import { FadeIn } from './HomeSections';
 import { TAB_BAR_CLEARANCE } from './TabBar';
@@ -44,15 +42,9 @@ type Props = {
 
 const PERIOD_NAME: Record<Budget['period'], string> = { month: 'Monthly', week: 'Weekly', custom: 'Custom' };
 
-const THEMES: { key: ThemePreference; label: string }[] = [
-  { key: 'system', label: 'System' },
-  { key: 'light', label: 'Light' },
-  { key: 'dark', label: 'Dark' },
-];
-
-/** On = peacock track; the thumb stays readable in both modes. */
+/** On = the blue selection accent (docs/DESIGN.md). */
 const switchColors = (c: Palette, isDark: boolean) => ({
-  trackColor: { false: c.line, true: c.peacock },
+  trackColor: { false: c.surfaceSunken, true: c.info },
   thumbColor: isDark ? c.ink : c.surface,
 });
 
@@ -141,7 +133,7 @@ export function ProfileTab({
   onToast,
 }: Props) {
   const s = useStyles();
-  const { c, isDark, preference, setPreference } = useTheme();
+  const { c, isDark } = useTheme();
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricsOn, setBiometricsOn] = useState(false);
   const [togglingBiometrics, setTogglingBiometrics] = useState(false);
@@ -273,26 +265,9 @@ export function ProfileTab({
           />
         </Card>
 
-        <SectionHeading title="Spendd Data Processing" />
+        <SectionHeading title="Spendd data processing" />
         <Card padded={false}>
           <AiSection />
-        </Card>
-
-        <SectionHeading title="Appearance" />
-        <Card padded={false}>
-          <View style={s.themeRow}>
-            <Text style={s.rowLabel}>Theme</Text>
-            <Text style={s.rowValue}>
-              {preference === 'system' ? 'Follows your phone’s setting' : `Always ${preference}`}
-            </Text>
-            <View style={s.themeChips}>
-              <Chips
-                options={THEMES.map(t => t.label)}
-                selected={THEMES.find(t => t.key === preference)!.label}
-                onSelect={label => setPreference(THEMES.find(t => t.label === label)!.key)}
-              />
-            </View>
-          </View>
         </Card>
 
         <SectionHeading title="Security" />
@@ -325,7 +300,7 @@ export function ProfileTab({
           <Row label="Reset Spendd" value="Erase everything on this phone" danger onPress={confirmReset} />
         </Card>
 
-        <PrivacyBadge text="Your data and insights stay on this phone." style={s.footer} />
+        <PrivacyBadge text="Your transactions stay on this phone." style={s.footer} />
       </FadeIn>
     </ScrollView>
   );
@@ -341,7 +316,7 @@ const useStyles = makeStyles(c => ({
   statsCard: { marginTop: space[2] },
   statRow: { flexDirection: 'row' },
   stat: { flex: 1, paddingHorizontal: space[4], paddingVertical: space[4] },
-  statLabel: { ...type.caption, color: c.inkMuted },
+  statLabel: { ...type.eyebrow, color: c.inkMuted },
   statValue: { ...type.amountMedium, color: c.ink, marginTop: space[1] },
   row: {
     flexDirection: 'row',
@@ -357,7 +332,5 @@ const useStyles = makeStyles(c => ({
   rowLabel: { ...type.bodyStrong, color: c.ink },
   rowValue: { ...type.caption, color: c.inkMuted, marginTop: 2 },
   danger: { color: c.low },
-  themeRow: { paddingHorizontal: space[4], paddingVertical: space[4] },
-  themeChips: { marginTop: space[3] },
   footer: { alignSelf: 'center', marginTop: SECTION_GAP },
 }));

@@ -4,7 +4,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 /**
  * ₹1,23,456 — Indian grouping. No paise from ₹100 up; below that, paise only when non-zero
- * (₹42.50). DESIGN.md §4.4.
+ * (₹42.50). docs/DESIGN.md.
  */
 export function formatRupees(amount: number): string {
   const abs = Math.abs(amount);
@@ -111,7 +111,7 @@ export const daysBetween = (from: number, to: number) => Math.round((to - from) 
 
 export type DaySection = { title: string; data: Transaction[] };
 
-/** Newest first, grouped under "Today" / "Yesterday" / "12 Jul 2026" (DESIGN.md §4.4). */
+/** Newest first, grouped under "Today" / "Yesterday" / "12 Jul 2026" (docs/DESIGN.md). */
 export function groupByDay(transactions: Transaction[], now: number = Date.now()): DaySection[] {
   const today = startOfDay(now);
   const yesterday = startOfDay(today - 1);

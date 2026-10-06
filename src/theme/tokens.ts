@@ -1,4 +1,4 @@
-/** Design tokens from docs/DESIGN.md §3. */
+/** Design tokens from docs/DESIGN.md: near-black artboard, white pills, one blue, gradient spotlights. */
 import type { TextStyle } from 'react-native';
 
 export type Palette = {
@@ -22,99 +22,101 @@ export type Palette = {
   headsup: string;
   low: string;
   info: string;
+  /** Check glyphs only (docs/DESIGN.md semantic-success), never a surface. */
+  success: string;
   jar: { mint: string; sky: string; peach: string; lilac: string; haldi: string; rose: string };
 };
 
-export const light: Palette = {
-  bg: '#F3F4F8',
-  surface: '#FFFFFF',
-  surfaceSunken: '#E8EAF2',
-  ink: '#1B1847',
-  inkMuted: '#5B5878',
-  inkSubtle: '#8D8AA6',
-  line: '#DCDEE9',
-  marigold: '#FFB000',
-  marigoldSoft: '#FFF1CC',
-  onMarigold: '#1B1847',
-  onInk: '#FFFFFF',
-  rani: '#E5007D',
-  raniSoft: '#FFE0F0',
-  peacock: '#0B7F82',
-  peacockSoft: '#D4F1F1',
-  headsup: '#C27400',
-  low: '#B8441C',
-  info: '#4B47C4',
-  jar: { mint: '#BDEBD3', sky: '#C3DBFF', peach: '#FFD3BD', lilac: '#DCCFFF', haldi: '#FFE79A', rose: '#FFCCDA' },
-};
-
 /**
- * Dark mode: deep black and white with frosted-glass surfaces (translucent white over black,
- * hairline white edges). White is the hero colour, so the primary action is a white button with
- * black text; colour appears only as a small signal (income, wins, heads-ups).
+ * docs/DESIGN.md: a near-black artboard. Hierarchy comes from surface lift (canvas → surface-1 →
+ * surface-2) and ink → ink-muted, never from colour. One blue (`info`) marks links, focus and
+ * selection; gradient spotlight cards (see components/Spotlight.tsx) are the only colour fills.
+ * Dark is the only mode.
  */
 export const dark: Palette = {
-  bg: '#050505',
-  surface: 'rgba(255,255,255,0.06)',
-  surfaceSunken: 'rgba(255,255,255,0.07)',
+  bg: '#090909',
+  surface: '#141414',
+  surfaceSunken: '#1C1C1C',
   ink: '#FFFFFF',
-  inkMuted: 'rgba(255,255,255,0.66)',
-  inkSubtle: 'rgba(255,255,255,0.42)',
-  line: 'rgba(255,255,255,0.12)',
+  inkMuted: '#999999',
+  inkSubtle: '#666666',
+  line: '#262626',
+  // Primary actions are white pills with black labels.
   marigold: '#FFFFFF',
-  marigoldSoft: 'rgba(255,255,255,0.14)',
-  onMarigold: '#050505',
-  onInk: '#050505',
-  rani: '#FF6FB5',
-  raniSoft: 'rgba(255,111,181,0.14)',
-  peacock: '#6FE3C8',
-  peacockSoft: 'rgba(111,227,200,0.12)',
-  headsup: '#F7C860',
-  low: '#FF9478',
-  info: '#B8B5FF',
-  // Monochrome glass tiles: the icon tells categories apart, so colour is kept for signals only.
-  jar: {
-    mint: 'rgba(255,255,255,0.10)',
-    sky: 'rgba(255,255,255,0.10)',
-    peach: 'rgba(255,255,255,0.10)',
-    lilac: 'rgba(255,255,255,0.10)',
-    haldi: 'rgba(255,255,255,0.10)',
-    rose: 'rgba(255,255,255,0.10)',
-  },
+  marigoldSoft: '#1C1C1C',
+  onMarigold: '#000000',
+  onInk: '#000000',
+  rani: '#FFFFFF',
+  raniSoft: '#1C1C1C',
+  peacock: '#FFFFFF',
+  peacockSoft: '#1C1C1C',
+  headsup: '#FFFFFF',
+  low: '#FFFFFF',
+  /** The single accent: links, focus rings, selection. Never a fill for buttons or sections. */
+  info: '#0099FF',
+  success: '#22C55E',
+  jar: { mint: '#1C1C1C', sky: '#1C1C1C', peach: '#1C1C1C', lilac: '#1C1C1C', haldi: '#1C1C1C', rose: '#1C1C1C' },
 };
 
+/** Kept so older imports compile; Spendd has one (dark) look. */
+export const light: Palette = dark;
+
+/** Gradient spotlight cards: one or two per screen at most. [start, end] stops. */
+export const spotlight = {
+  violet: ['#6A4CF5', '#3A1F9E'],
+  magenta: ['#D44DF0', '#6A4CF5'],
+  orange: ['#FF7A3D', '#FF5577'],
+  coral: ['#FF5577', '#D44DF0'],
+} as const;
+export type SpotlightTone = keyof typeof spotlight;
 
 // Font files live in android/app/src/main/assets/fonts; fontFamily must match the file name.
+// Inter (SIL Open Font License) stands in for GT Walsheim, as docs/DESIGN.md suggests: SemiBold
+// with tight negative tracking for display, Regular/Medium for everything else.
 export const fontFamily = {
-  display: 'Bricolage-SemiBold',
-  displayBold: 'Bricolage-Bold',
-  body: 'Atkinson-Regular',
-  bodyBold: 'Atkinson-Bold',
+  display: 'Inter-SemiBold',
+  displayBold: 'Inter-SemiBold',
+  body: 'Inter-Regular',
+  bodyBold: 'Inter-Medium',
+  medium: 'Inter-Medium',
 };
 
 const tabular: TextStyle = { fontVariant: ['tabular-nums'] };
 
-/** DESIGN.md §3.2. Colour is applied by the caller. */
+/**
+ * docs/DESIGN.md typography: tracking tightens hard as size grows (about -4% on display, -1% on
+ * body); weights stay in a narrow band. Sentence case everywhere. Colour is applied by the caller.
+ */
 export const type = {
-  amountHero: { fontFamily: fontFamily.displayBold, fontSize: 48, lineHeight: 56, ...tabular },
-  story: { fontFamily: fontFamily.display, fontSize: 28, lineHeight: 34 },
-  title: { fontFamily: fontFamily.display, fontSize: 22, lineHeight: 28 },
-  heading: { fontFamily: fontFamily.bodyBold, fontSize: 18, lineHeight: 24 },
-  body: { fontFamily: fontFamily.body, fontSize: 16, lineHeight: 24 },
-  bodyStrong: { fontFamily: fontFamily.bodyBold, fontSize: 16, lineHeight: 24 },
-  label: { fontFamily: fontFamily.bodyBold, fontSize: 14, lineHeight: 20 },
-  caption: { fontFamily: fontFamily.body, fontSize: 13, lineHeight: 18 },
+  amountHero: { fontFamily: fontFamily.display, fontSize: 52, lineHeight: 54, letterSpacing: -2.4, ...tabular },
+  /** Screen headline: poster-like, tight. */
+  story: { fontFamily: fontFamily.display, fontSize: 30, lineHeight: 33, letterSpacing: -1.1 },
+  title: { fontFamily: fontFamily.display, fontSize: 22, lineHeight: 26, letterSpacing: -0.8 },
+  /** Section titles and header titles. */
+  heading: { fontFamily: fontFamily.display, fontSize: 18, lineHeight: 22, letterSpacing: -0.5 },
+  body: { fontFamily: fontFamily.body, fontSize: 15, lineHeight: 21, letterSpacing: -0.15 },
+  bodyStrong: { fontFamily: fontFamily.medium, fontSize: 15, lineHeight: 21, letterSpacing: -0.15 },
+  label: { fontFamily: fontFamily.medium, fontSize: 14, lineHeight: 20, letterSpacing: -0.14 },
+  caption: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 17, letterSpacing: -0.13 },
+  /** Small muted label above content ("Daily budget"). */
+  eyebrow: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 16, letterSpacing: -0.13 },
+  /** Pill button label. */
+  button: { fontFamily: fontFamily.medium, fontSize: 15, lineHeight: 18, letterSpacing: -0.15 },
+  /** Lead text inside spotlight cards and next to display headlines. */
+  subhead: { fontFamily: fontFamily.body, fontSize: 19, lineHeight: 25, letterSpacing: -0.2 },
   /** Amounts inside lists and rows. */
-  amount: { fontFamily: fontFamily.bodyBold, fontSize: 16, lineHeight: 24, ...tabular },
+  amount: { fontFamily: fontFamily.medium, fontSize: 15, lineHeight: 21, letterSpacing: -0.15, ...tabular },
   /** Mid-size amounts (cards, tiles). */
-  amountMedium: { fontFamily: fontFamily.displayBold, fontSize: 24, lineHeight: 30, ...tabular },
+  amountMedium: { fontFamily: fontFamily.display, fontSize: 26, lineHeight: 30, letterSpacing: -0.9, ...tabular },
 } satisfies Record<string, TextStyle>;
 
-/** 4-point scale (DESIGN.md §3.3): space[4] = 16. */
+/** Spacing scale (docs/DESIGN.md runs on 4/8/12/15/20/30/40). */
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40, 12: 48 } as const;
 export const SCREEN_PADDING = space[5];
-export const SECTION_GAP = space[8];
+export const SECTION_GAP = space[10];
 
-export const radius = { s: 8, m: 14, l: 24, xl: 32, pill: 999 } as const;
+/** 6 tags, 10 inputs and list items, 20 cards, 30 spotlight cards; pill for buttons and chips. */
+export const radius = { s: 6, m: 10, l: 20, xl: 30, pill: 999 } as const;
 
 export const TOUCH_TARGET = 44;
 

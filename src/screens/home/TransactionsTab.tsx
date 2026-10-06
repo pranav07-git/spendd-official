@@ -316,7 +316,7 @@ const useStyles = makeStyles(c => ({
     marginTop: space[6],
     marginBottom: space[2],
   },
-  dayTitle: { ...type.label, color: c.inkMuted },
+  dayTitle: { ...type.eyebrow, color: c.inkMuted },
   dayTotal: { ...type.caption, color: c.inkMuted, fontVariant: ['tabular-nums'] },
   row: {
     minHeight: 64,

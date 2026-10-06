@@ -35,7 +35,12 @@ export function parseCategorizeRequest(body: unknown): MerchantQuery[] {
       throw new BadRequest(`merchants[${i}].key must be a unique string`);
     }
     seen.add(raw.key);
-    const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+    // Control characters and line breaks have no place in a name; dropping them keeps OCR'd text
+    // from posing as extra instructions in the prompt.
+    const text = (v: unknown, max: number) => {
+      const clean = typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').trim() : '';
+      return clean ? clean.slice(0, max) : null;
+    };
     const num = (v: unknown, min: number, max: number) =>
       typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? Math.round(v) : null;
     const query = {
@@ -72,42 +77,72 @@ export function vetAnswers(raw: unknown, queries: MerchantQuery[]): MerchantAnsw
   return [...out.values()];
 }
 
+type Entry = { category: Category; confidence: Confidence; at: number };
+
+/** Shared answers expire, so a wrong one doesn't last for ever and merchants that change are re-asked. */
+const TTL_MS = 90 * 24 * 60 * 60_000;
+/** Oldest answers are dropped past this, so the cache can't be grown without bound. */
+const MAX_ENTRIES = 50_000;
+
+const norm = (s: string | null) => (s ?? '').toLowerCase().replace(/[^a-z0-9@.]+/g, ' ').trim();
+
 /**
  * Merchant → category answers shared by every user, so each merchant costs one model call in
  * total. Only confident answers about businesses are kept; people are never stored.
- * The key is the merchant's identity without the direction prefix ("upi:blinkit@hdfcbank").
+ *
+ * Answers are filed under exactly what the model was shown (UPI ID and name), worked out here and
+ * never taken from the client's `key`. So a request can only ever affect payees with that same UPI
+ * ID *and* name: it can't file "Apollo Pharmacy" under Zomato's UPI ID for everyone else.
  */
 export class MerchantCache {
-  private entries = new Map<string, { category: Category; confidence: Confidence; at: number }>();
+  private entries = new Map<string, Entry>();
   private file: string | null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private now: () => number;
 
-  constructor(file: string | null) {
+  constructor(file: string | null, now: () => number = Date.now) {
     this.file = file;
+    this.now = now;
     if (file) {
       try {
-        const saved = JSON.parse(readFileSync(file, 'utf8')) as Record<string, { category: Category; confidence: Confidence; at: number }>;
-        Object.entries(saved).forEach(([k, v]) => this.entries.set(k, v));
+        const saved = JSON.parse(readFileSync(file, 'utf8')) as Record<string, Entry>;
+        Object.entries(saved)
+          // Older files were keyed by the client's key; those can't be trusted, so start again.
+          .filter(([k]) => k.includes('|'))
+          .forEach(([k, v]) => this.entries.set(k, v));
       } catch {
         // No cache yet.
       }
     }
   }
 
-  static identity(key: string): string {
-    return key.replace(/^(debit|credit):/, '');
+  static identity(query: Pick<MerchantQuery, 'name' | 'handle'>): string {
+    return `${norm(query.handle)}|${norm(query.name)}`;
   }
 
-  get(key: string): MerchantAnswer | null {
-    const hit = this.entries.get(MerchantCache.identity(key));
-    return hit ? { key, category: hit.category, confidence: hit.confidence, isPerson: false } : null;
+  get(query: MerchantQuery): MerchantAnswer | null {
+    const id = MerchantCache.identity(query);
+    const hit = this.entries.get(id);
+    if (!hit) {
+      return null;
+    }
+    if (this.now() - hit.at > TTL_MS) {
+      this.entries.delete(id);
+      return null;
+    }
+    return { key: query.key, category: hit.category, confidence: hit.confidence, isPerson: false };
   }
 
-  put(answer: MerchantAnswer) {
+  put(query: MerchantQuery, answer: MerchantAnswer) {
     if (answer.isPerson || answer.confidence === 'low' || answer.category === 'Personal' || answer.category === 'Other') {
       return;
     }
-    this.entries.set(MerchantCache.identity(answer.key), { category: answer.category, confidence: answer.confidence, at: Date.now() });
+    const id = MerchantCache.identity(query);
+    this.entries.delete(id); // re-insert so Map order stays oldest-first
+    this.entries.set(id, { category: answer.category, confidence: answer.confidence, at: this.now() });
+    while (this.entries.size > MAX_ENTRIES) {
+      this.entries.delete(this.entries.keys().next().value!);
+    }
     this.scheduleSave();
   }
 

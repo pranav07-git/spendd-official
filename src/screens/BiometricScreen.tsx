@@ -74,7 +74,6 @@ export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
       <View style={s.actions}>
         <PrimaryButton label="Turn on fingerprint unlock" onPress={enable} loading={busy} />
         <TextButton label="Maybe later" onPress={finish} style={s.later} />
-        <Text style={s.footer}>Your fingerprint stays on this phone. Spendd never sees it.</Text>
       </View>
     </Screen>
   );
@@ -100,5 +99,4 @@ const useStyles = makeStyles(c => ({
   message: { ...type.caption, color: c.low, textAlign: 'center', marginBottom: space[3] },
   actions: { paddingHorizontal: SCREEN_PADDING, paddingBottom: space[4] },
   later: { marginTop: space[2] },
-  footer: { ...type.caption, color: c.inkMuted, textAlign: 'center', marginTop: space[4] },
 }));

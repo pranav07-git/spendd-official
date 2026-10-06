@@ -15,13 +15,13 @@ App relaunch (setup complete) ─▶ Enter PIN / biometric ┘
 | Screen | Behaviour |
 | --- | --- |
 | Intro | Animated insight cards, **Next**. |
-| Consent | **Allow & continue** is disabled until the agreement box is ticked. On allow, consent is recorded. **Not now** continues without it. |
+| Consent | **Allow & continue** is disabled until the agreement box is ticked. On allow, consent is recorded. There is no skip. The Privacy Policy and Terms of Use links open in-app pages (`src/legal/documents.ts`). |
 | Add PIN | 4-digit keypad, rejects trivially guessable PINs (1111, 1234, 9876…). Long-press ⌫ clears. |
 | Retype PIN | Must match; mismatch shakes, vibrates and clears. PIN is stored in the Android Keystore (`react-native-keychain`). |
 | Setup Biometric | **Enable biometrics** creates a biometric-bound Keystore key (shows the system prompt). **Maybe later** skips. |
 | Enter PIN (relaunch) | Auto-prompts biometrics if enabled (fingerprint key in the keypad's bottom-left), 5 wrong PINs → 30 s lockout. **Forgot PIN?** resets the app after confirmation. |
 
-The greeting name and the Privacy Policy / Terms URLs are placeholders in [src/config.ts](src/config.ts).
+The greeting name is a placeholder in [src/config.ts](src/config.ts). The Privacy Policy and Terms of Use live in [src/legal/documents.ts](src/legal/documents.ts); fill in `LEGAL_CONTACT_EMAIL` before release.
 
 ## Logging payments from screenshots
 
@@ -127,9 +127,43 @@ npm run android      # terminal 2 – builds, installs and launches Spendd on th
 | Command | Purpose |
 | --- | --- |
 | `npm start` | Metro dev server |
-| `npm run android` | Build + install debug app on device/emulator |
+| `npm run android` | Forward ports 8081/8787, then build + install the debug app |
+| `npm run reverse` | Re-forward ports after wireless adb reconnects |
 | `npm test` | Jest unit tests |
 | `npm run lint` | ESLint |
+
+## Secrets
+
+- `src/secrets.ts` (git-ignored) holds `INSIGHTS_API_TOKEN`; copy `src/secrets.example.ts` to create it.
+  Use the same value as `SPENDD_APP_TOKEN` in `server/.env`. Generate one with `openssl rand -hex 32`.
+- A token in the app can always be extracted from the APK, so it only stops casual abuse; the server
+  also rate-limits per address.
+
+## Release build
+
+Release builds are minified (R8) and refuse to build without your own upload key. The debug key is
+public, so it is never used for release.
+
+```sh
+# Once: create the key, and keep it (and its passwords) safe. Losing it means you can't update the app.
+keytool -genkeypair -v -storetype PKCS12 -keystore ~/spendd-upload.keystore \
+  -alias spendd-upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Then add to `~/.gradle/gradle.properties` (outside the repo):
+
+```properties
+SPENDD_UPLOAD_STORE_FILE=/Users/<you>/spendd-upload.keystore
+SPENDD_UPLOAD_STORE_PASSWORD=...
+SPENDD_UPLOAD_KEY_ALIAS=spendd-upload
+SPENDD_UPLOAD_KEY_PASSWORD=...
+```
+
+```sh
+cd android && ./gradlew assembleRelease   # app/build/outputs/apk/release/app-release.apk
+```
+
+Set `PRODUCTION_API_URL` in `src/config.ts` to your HTTPS server first, or Spendd AI is off in that build.
 
 ## Spendd AI insights
 

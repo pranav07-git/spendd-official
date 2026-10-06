@@ -12,7 +12,7 @@ type ButtonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** Marigold, ink label, one per screen (DESIGN.md §5.1). */
+/** White pill, black label: the one main action on a screen (docs/DESIGN.md button-primary). */
 export function PrimaryButton({ label, onPress, disabled, loading, style }: ButtonProps) {
   const s = useStyles();
   const { c } = useTheme();
@@ -29,7 +29,7 @@ export function PrimaryButton({ label, onPress, disabled, loading, style }: Butt
   );
 }
 
-/** Surface fill with an ink outline. */
+/** Charcoal pill (docs/DESIGN.md button-secondary): secondary actions. */
 export function OutlineButton({ label, onPress, disabled, style }: ButtonProps) {
   const s = useStyles();
   return (
@@ -44,7 +44,7 @@ export function OutlineButton({ label, onPress, disabled, style }: ButtonProps) 
   );
 }
 
-/** Quiet text action: Skip, Not now, Learn more. */
+/** Quiet text action: Skip, Maybe later, Delete. */
 export function TextButton({
   label,
   onPress,
@@ -63,7 +63,7 @@ export function TextButton({
       accessibilityRole="button"
       hitSlop={12}
       onPress={onPress}
-      style={({ pressed }) => [s.quiet, pressed && s.pressed, style]}>
+      style={({ pressed }) => [s.quiet, pressed && s.dim, style]}>
       {({ pressed }) => (
         <Text style={[s.quietLabel, { color: color ?? c.ink }, pressed && s.underline]}>{label}</Text>
       )}
@@ -74,29 +74,29 @@ export function TextButton({
 const useStyles = makeStyles(c => ({
   primary: {
     minHeight: 52,
-    borderRadius: radius.m,
+    borderRadius: radius.pill,
     backgroundColor: c.marigold,
     paddingHorizontal: space[6],
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryDisabled: { backgroundColor: c.surfaceSunken },
-  primaryLabel: { ...type.label, fontSize: 16, color: c.onMarigold },
+  primaryLabel: { ...type.button, color: c.onMarigold },
   labelDisabled: { color: c.inkSubtle },
-  pressed: { transform: [{ scale: 0.97 }], opacity: 0.92 },
+  // docs/DESIGN.md: pressing shrinks the pill slightly instead of darkening it.
+  pressed: { transform: [{ scale: 0.97 }] },
+  dim: { opacity: 0.7 },
   outline: {
     minHeight: 52,
-    borderRadius: radius.m,
+    borderRadius: radius.pill,
     backgroundColor: c.surface,
-    borderWidth: 1.5,
-    borderColor: c.ink,
     paddingHorizontal: space[6],
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineDisabled: { opacity: 0.4 },
-  outlineLabel: { ...type.label, fontSize: 16, color: c.ink },
+  outlineLabel: { ...type.button, color: c.ink },
   quiet: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space[4] },
-  quietLabel: { ...type.label },
+  quietLabel: { ...type.button },
   underline: { textDecorationLine: 'underline' },
 }));

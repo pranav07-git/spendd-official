@@ -88,6 +88,16 @@ object ReceiptNotifications {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
+            // On the lock screen, show only that Spendd logged something, never the amount or payee.
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_stat_spendd)
+                    .setColor(0xFF000000.toInt())
+                    .setContentTitle("Spendd")
+                    .setContentText("Transaction update")
+                    .build(),
+            )
             .apply(build)
             .build()
     }

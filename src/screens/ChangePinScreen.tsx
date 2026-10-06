@@ -3,31 +3,24 @@ import { Alert } from 'react-native';
 import { PinEntry } from '../components/PinEntry';
 import type { ScreenProps } from '../navigation/types';
 import { isTooSimple } from '../pinRules';
-import { savePin, verifyPin } from '../storage/secure';
+import { checkPin, pinCheckMessage, savePin } from '../storage/secure';
 
 type Step = 'current' | 'new' | 'confirm';
-
-const MAX_ATTEMPTS = 5;
 
 /** Current PIN → new PIN → retype, on one screen. Each step remounts PinEntry so it starts empty. */
 export function ChangePinScreen({ navigation }: ScreenProps<'ChangePin'>) {
   const [step, setStep] = useState<Step>('current');
   const newPin = useRef('');
-  const attempts = useRef(0);
 
   const onComplete = async (pin: string): Promise<string | null> => {
     if (step === 'current') {
-      if (await verifyPin(pin)) {
+      // Shares the unlock screen's lockout, so this can't be used to guess the PIN either.
+      const result = await checkPin(pin);
+      if (result.ok) {
         setStep('new');
         return null;
       }
-      attempts.current += 1;
-      if (attempts.current >= MAX_ATTEMPTS) {
-        navigation.goBack();
-        return null;
-      }
-      const left = MAX_ATTEMPTS - attempts.current;
-      return `That’s not your PIN. ${left} ${left === 1 ? 'attempt' : 'attempts'} left.`;
+      return pinCheckMessage(result, 'That’s not your PIN.');
     }
     if (step === 'new') {
       if (isTooSimple(pin)) {

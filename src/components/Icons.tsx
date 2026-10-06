@@ -1,5 +1,5 @@
 /**
- * App icons: Lucide (https://lucide.dev, ISC), the rounded 2 px line set DESIGN.md §3.8 asks for.
+ * App icons: Lucide (https://lucide.dev, ISC), drawn at a 1.75 px stroke.
  * Every icon takes `size`, `color` (defaults to the theme's ink) and `strokeWidth`.
  */
 import type { ComponentType } from 'react';
@@ -104,7 +104,7 @@ export function CheckboxCheckedIcon({ size = 20, color }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 20 20">
       <Rect x={1} y={1} width={18} height={18} rx={5} fill={color ?? c.ink} />
-      <Path d="M5.5 10.2l3 3 6-6.4" stroke={c.onInk} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5.5 10.2l3 3 6-6.4" stroke={color ? '#FFFFFF' : c.onInk} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }

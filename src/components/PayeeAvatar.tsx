@@ -3,7 +3,7 @@ import { initialFor } from '../transactions/format';
 import type { Transaction } from '../transactions/types';
 import { jarColorFor, makeStyles, type, useTheme } from '../theme';
 
-/** Merchant avatar (DESIGN.md §3.8): a circle with the first letter on the payee's jar colour. */
+/** Payee avatar: the first letter in a charcoal circle. */
 export function PayeeAvatar({ tx, size = 40 }: { tx: Transaction; size?: number }) {
   const s = useStyles();
   const { c } = useTheme();

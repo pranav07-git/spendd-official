@@ -10,6 +10,7 @@ import {
   InfoIcon,
 } from '../../components/Icons';
 import { Card, SectionHeading } from '../../components/Layout';
+import { Spotlight } from '../../components/Spotlight';
 import type {
   DailyBudget,
   DailyStatus,
@@ -65,35 +66,34 @@ export function SectionTitle({ title, action }: { title: string; action?: { labe
 
 export function DailyStatusCard({ status }: { status: DailyStatus }) {
   const s = useStyles();
-  const { c } = useTheme();
   const less = (status.changeVsUsualPct ?? 0) <= 0;
   const Arrow = less ? ArrowDownIcon : ArrowUpIcon;
-  const changeColor = less ? c.peacock : c.headsup;
+  // Home's one gradient spotlight (docs/DESIGN.md); everything on it is white.
   return (
-    <Card>
-      <Text style={s.cardLabel}>Daily status</Text>
+    <Spotlight tone="violet">
+      <Text style={[s.cardLabel, s.onSpotlightMuted]}>Daily status</Text>
 
       <View accessible accessibilityLabel={`${formatRupees(status.safeToSpend)} safe to spend`}>
-        <Text style={s.heroAmount}>{formatRupees(status.safeToSpend)}</Text>
-        <Text style={s.heroCaption}>safe to spend</Text>
+        <Text style={[s.heroAmount, s.onSpotlight]}>{formatRupees(status.safeToSpend)}</Text>
+        <Text style={[s.heroCaption, s.onSpotlightMuted]}>safe to spend</Text>
       </View>
 
       {status.spendBelowToday != null ? (
-        <Text style={s.statusLine}>
+        <Text style={[s.statusLine, s.onSpotlight]}>
           Spend under <Text style={s.strong}>{formatRupees(status.spendBelowToday)}</Text> today to stay on track.
         </Text>
       ) : (
-        <Text style={s.statusLine}>Log a few days of spends, or set a budget, and you’ll get a daily limit here.</Text>
+        <Text style={[s.statusLine, s.onSpotlight]}>Log a few days of spends, or set a budget, and you’ll get a daily limit here.</Text>
       )}
       {status.changeVsUsualPct != null ? (
         <View style={s.changeRow}>
-          <Arrow size={16} color={changeColor} strokeWidth={2} />
-          <Text style={[s.changeLabel, { color: changeColor }]}>
+          <Arrow size={16} color="#FFFFFF" strokeWidth={2} />
+          <Text style={[s.changeLabel, s.onSpotlight]}>
             {Math.abs(status.changeVsUsualPct)}% {less ? 'less' : 'more'} than your usual spending
           </Text>
         </View>
       ) : null}
-    </Card>
+    </Spotlight>
   );
 }
 
@@ -190,7 +190,7 @@ export function AiNote({ thinking, written }: { thinking: boolean; written: bool
         <BotIcon size={14} color={c.inkMuted} strokeWidth={1.8} />
       )}
       <Text style={s.aiNoteText}>
-        {thinking ? 'Spendd AI is writing your insights…' : 'Written by Spendd from your numbers'}
+        {thinking ? 'Spendd is writing your insights…' : 'Written by Spendd from your numbers'}
       </Text>
     </View>
   );
@@ -261,7 +261,7 @@ export function DailyBudgetCard({ budget }: { budget: DailyBudget }) {
   );
 }
 
-/** Read-only habit chips (DESIGN.md §5.5): surface with a line outline. */
+/** Read-only habit chips (docs/DESIGN.md): surface with a line outline. */
 export function HabitChips({ habits }: { habits: Habit[] }) {
   const s = useStyles();
   return (
@@ -293,7 +293,9 @@ const useStyles = makeStyles((c, isDark) => ({
 
   sectionAction: { alignSelf: 'auto', paddingHorizontal: space[2], marginRight: -space[2] },
 
-  cardLabel: { ...type.label, color: c.inkMuted },
+  cardLabel: { ...type.eyebrow, color: c.inkMuted },
+  onSpotlight: { color: '#FFFFFF' },
+  onSpotlightMuted: { color: 'rgba(255,255,255,0.75)' },
   heroAmount: { ...type.amountHero, color: c.ink, marginTop: space[2] },
   heroCaption: { ...type.body, color: c.inkMuted },
   statusLine: { ...type.body, color: c.ink, marginTop: space[4] },

@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { makeStyles, radius, space } from '../theme';
 
-/** Segmented progress for short sequences (DESIGN.md §5.11). */
+/** Segmented progress for short sequences (docs/DESIGN.md). */
 export function ProgressBars({ total, active }: { total: number; active: number }) {
   const s = useStyles();
   return (
@@ -15,7 +15,7 @@ export function ProgressBars({ total, active }: { total: number; active: number 
 
 const useStyles = makeStyles(c => ({
   row: { flexDirection: 'row', gap: space[2] },
-  bar: { flex: 1, maxWidth: 56, height: 4, borderRadius: radius.pill, backgroundColor: c.line },
-  done: { backgroundColor: c.ink },
-  active: { backgroundColor: c.marigold },
+  bar: { flex: 1, maxWidth: 56, height: 4, borderRadius: radius.pill, backgroundColor: c.surfaceSunken },
+  done: { backgroundColor: c.inkSubtle },
+  active: { backgroundColor: c.ink },
 }));

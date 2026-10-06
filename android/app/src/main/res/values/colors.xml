@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#000000</color>
-    <!-- DESIGN.md color.bg; values-night has the dark one. -->
-    <color name="window_background">#F3F4F8</color>
+    <!-- docs/DESIGN.md canvas #090909: Spendd is dark only. -->
+    <color name="window_background">#090909</color>
 </resources>

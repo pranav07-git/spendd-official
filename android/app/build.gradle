@@ -57,7 +57,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -70,6 +70,19 @@ def enableProguardInReleaseBuilds = false
  * give correct results when using with locales other than en-US. Note that
  * this variant is about 6MiB larger per architecture than default.
  */
+def hasUploadKey = ['SPENDD_UPLOAD_STORE_FILE', 'SPENDD_UPLOAD_STORE_PASSWORD', 'SPENDD_UPLOAD_KEY_ALIAS', 'SPENDD_UPLOAD_KEY_PASSWORD']
+    .every { project.hasProperty(it) }
+
+// A release build without the upload key would be unsigned (or, before, debug-signed): stop early.
+gradle.taskGraph.whenReady { graph ->
+    def wantsRelease = graph.allTasks.any { it.project == project && it.name ==~ /(assemble|bundle|install|package)Release.*/ }
+    if (wantsRelease && !hasUploadKey) {
+        throw new GradleException("Release builds need your upload key: set SPENDD_UPLOAD_STORE_FILE, " +
+            "SPENDD_UPLOAD_STORE_PASSWORD, SPENDD_UPLOAD_KEY_ALIAS and SPENDD_UPLOAD_KEY_PASSWORD in " +
+            "~/.gradle/gradle.properties (see README, Release build).")
+    }
+}
+
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
@@ -93,16 +106,28 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Your private upload key. Its path and passwords go in ~/.gradle/gradle.properties (never in
+        // this repo): SPENDD_UPLOAD_STORE_FILE, SPENDD_UPLOAD_STORE_PASSWORD, SPENDD_UPLOAD_KEY_ALIAS,
+        // SPENDD_UPLOAD_KEY_PASSWORD. See README "Release build".
+        if (hasUploadKey) {
+            release {
+                storeFile file(SPENDD_UPLOAD_STORE_FILE)
+                storePassword SPENDD_UPLOAD_STORE_PASSWORD
+                keyAlias SPENDD_UPLOAD_KEY_ALIAS
+                keyPassword SPENDD_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Never the debug key: its password is public, so anyone could sign an "update" that
+            // installs over Spendd and reads its data.
+            signingConfig hasUploadKey ? signingConfigs.release : null
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
