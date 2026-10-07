@@ -232,4 +232,49 @@ class ReceiptParserTest {
         assertEquals("9876543210@ybl", r.handle)
         assertEquals("rohit@okaxis", parseRows("₹10" to 80, "Paid to rohit @ okaxis" to 30).handle)
     }
+
+    // ---- only payment confirmations are logged -------------------------------------------------
+
+    @Test
+    fun everyPaymentScreenAboveCountsAsAPayment() {
+        listOf(
+            parseRows("349" to 90, "Paid to Zomato" to 28, "Today, 1:05 PM" to 24),
+            parseRows("Z 1,250" to 80, "Sent to Ravi Kumar" to 28, "28 Dec, 9:41 AM" to 24),
+            parseRows("Paid ₹1,299 to Myntra Designs" to 30, "on 21 Jun 2026 at 6:40 pm" to 22),
+            parseRows("Rs.120.50 debited from A/c XX1234 on 09-07-26 to VPA swiggy@icici. UPI Ref 512345678901" to 24),
+            parseRows("Received from" to 26, "Priya Sharma" to 34, "+ ₹5,000" to 80, "3 Aug 2026, 10:12 AM" to 24),
+            parseRows("Transaction Successful" to 34, "Amount" to 22, "₹ 2,450.00" to 30, "UPI Ref No." to 22, "418723901234" to 26),
+        ).forEach { assertTrue(it.looksLikePayment) }
+    }
+
+    @Test
+    fun aShoppingPageWithAPriceIsNotAPayment() {
+        val r = parseRows("Nike Air Zoom" to 30, "₹1,299" to 80, "Add to cart" to 26, "Buy now" to 26, "Pay with UPI" to 22)
+        assertEquals(1299.0, r.amount!!, 0.0)
+        assertFalse(r.looksLikePayment)
+    }
+
+    @Test
+    fun aChatMentioningMoneyIsNotAPayment() {
+        val r = parseRows("Today" to 22, "I sent you ₹500 for dinner" to 26, "10:32 pm" to 20)
+        assertFalse(r.looksLikePayment)
+    }
+
+    @Test
+    fun aBillOrPaymentRequestIsNotAPayment() {
+        assertFalse(parseRows("Electricity bill" to 30, "₹2,000" to 80, "Due 15 Oct 2026" to 22, "Pay to bescom@ybl" to 22).looksLikePayment)
+        assertFalse(parseRows("Ravi requested" to 30, "₹300" to 80, "Pay now" to 26).looksLikePayment)
+    }
+
+    @Test
+    fun aFailedPaymentIsNotLogged() {
+        val r = parseRows("Payment failed" to 30, "₹500" to 80, "to Ravi Kumar" to 26, "UPI Ref 512345678901" to 22)
+        assertFalse(r.looksLikePayment)
+    }
+
+    @Test
+    fun anUnreadableAmountNeedsWordingAndAReference() {
+        assertTrue(parseRows("Payment Successful" to 30, "Rohit Joshi" to 26, "XXXXXX8133" to 22).looksLikePayment)
+        assertFalse(parseRows("UPI" to 30, "rohit@okaxis" to 26).looksLikePayment)
+    }
 }

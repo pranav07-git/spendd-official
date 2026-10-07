@@ -37,7 +37,7 @@ class ReceiptWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             throw e
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to read receipt", e)
-            logUnreadable(sourceApp, notificationId)
+            logUnreadable(notificationId)
         }
         // The screenshot is only needed for OCR; don't keep financial images around.
         image.delete()
@@ -60,7 +60,8 @@ class ReceiptWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val (lines, imageHeight) = ReceiptOcr.recognize(image)
             val parsed = ReceiptParser.parse(lines, imageHeight)
             val amount = parsed.amount
-            if (amount == null && !parsed.looksLikePayment) {
+            // Only completed payments' confirmation screens are logged; anything else is left out.
+            if (!parsed.looksLikePayment) {
                 ReceiptNotifications.failed(
                     applicationContext,
                     notificationId,
@@ -99,7 +100,7 @@ class ReceiptWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                     put("occurredAt", occurredAt)
                     put("hasTime", parsed.date?.hour != null || !dateFromReceipt)
                     put("dateFromReceipt", dateFromReceipt)
-                    // Logged even when the amount couldn't be read, so no shared payment is lost.
+                    // A confirmation whose amount couldn't be read is logged for the user to complete.
                     put("needsReview", amount == null || parsed.counterparty == null)
                     put("createdAt", System.currentTimeMillis())
                     put("rawText", lines.joinToString("\n") { it.text })
@@ -119,41 +120,9 @@ class ReceiptWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         }
     }
 
-    /** Never drop a shared payment: log it for the user to complete by hand. */
-    private fun logUnreadable(sourceApp: String?, notificationId: Int) {
-        val logged = runCatching {
-                TransactionStore(applicationContext).add(
-                    JSONObject().apply {
-                        put("id", UUID.randomUUID().toString())
-                        put("amount", JSONObject.NULL)
-                        put("currency", "INR")
-                        put("direction", "debit")
-                        put("counterparty", JSONObject.NULL)
-                        put("handle", JSONObject.NULL)
-                        put("txnRef", JSONObject.NULL)
-                        put("bank", JSONObject.NULL)
-                        put("source", sourceApp ?: JSONObject.NULL)
-                        put("category", "Personal")
-                        put("kind", "personal")
-                        put("occurredAt", System.currentTimeMillis())
-                        put("hasTime", true)
-                        put("dateFromReceipt", false)
-                        put("needsReview", true)
-                        put("createdAt", System.currentTimeMillis())
-                        put("rawText", "")
-                    },
-                )
-            }.isSuccess
-        if (logged) {
-            ReceiptNotifications.logged(
-                applicationContext,
-                notificationId,
-                "Transaction logged · needs review",
-                "Couldn’t read the screenshot. Open Spendd to add the amount and payee.",
-            )
-        } else {
-            ReceiptNotifications.failed(applicationContext, notificationId, "Couldn’t read that image. Try sharing it again.")
-        }
+    /** OCR failed, so there's no telling whether it was a payment: log nothing and say so. */
+    private fun logUnreadable(notificationId: Int) {
+        ReceiptNotifications.failed(applicationContext, notificationId, "Couldn’t read that image. Try sharing the screenshot again.")
     }
 
     private fun describe(parsed: ParsedReceipt): String {

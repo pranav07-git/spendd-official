@@ -26,7 +26,7 @@ data class ParsedReceipt(
     val txnRef: String?,
     val bank: String?,
     val provider: String?,
-    /** Whether the text reads like a payment at all (used when no amount was found). */
+    /** Whether the image is a completed payment's confirmation screen; only these are logged. */
     val looksLikePayment: Boolean,
 )
 
@@ -66,10 +66,13 @@ object ReceiptParser {
         "\\b(received from|you received|money received|payment received|received successfully|credited|refund(ed)?)\\b",
         IC,
     )
-    private val PAYMENT_HINT = Regex(
-        "\\b(paid|payment|pay|transaction|txn|upi|debited|credited|received|sent|transfer(red)?|successful|utr|ref)\\b",
+    /** Wording a finished payment uses ("Paid to", "Payment successful", "Debited"), not "Pay now". */
+    private val CONFIRMED = Regex(
+        "\\b(paid|sent|received|debited|credited|transferred|successful|successfully|completed|payment done)\\b",
         IC,
     )
+    /** A payment that didn't go through is never logged. */
+    private val NOT_COMPLETED = Regex("\\b(failed|failure|declined|unsuccessful|cancelled|canceled|expired)\\b", IC)
 
     private val INLINE_TO = Regex("(?:^|\\b(?:paid|sent|transferred|paying|payment|transfer|money|debited)\\b.*?)\\bto\\s*:?\\s+(.+)$", IC)
     private val INLINE_FROM = Regex("(?:^|\\b(?:received|credited|money|payment)\\b.*?)\\bfrom\\s*:?\\s+(.+)$", IC)
@@ -142,9 +145,25 @@ object ReceiptParser {
             txnRef = txnRef,
             bank = BANK.find(allText)?.groupValues?.get(1)?.trim(),
             provider = VIA.find(allText)?.groupValues?.get(1)?.takeUnless { it.equals("upi", ignoreCase = true) },
-            looksLikePayment = amount != null || txnRef != null || handle != null ||
-                (date != null && lines.count { PAYMENT_HINT.containsMatchIn(it.text) } > 0),
+            looksLikePayment = isPaymentConfirmation(lines, amount != null, txnRef != null || handle != null),
         )
+    }
+
+    /**
+     * A shopping page, a bill or a chat can show "₹499" too, so an amount alone isn't enough. A
+     * confirmation screen also has at least two of: finished-payment wording, a reference (UPI ID,
+     * transaction ID, masked account) and the other party named after "to"/"from" or a payee label.
+     * Without a readable amount it needs the wording and a reference.
+     */
+    private fun isPaymentConfirmation(lines: List<OcrLine>, hasAmount: Boolean, hasReference: Boolean): Boolean {
+        if (lines.any { NOT_COMPLETED.containsMatchIn(it.text) }) return false
+        val confirmed = lines.any { CONFIRMED.containsMatchIn(it.text) }
+        val namesParty = lines.any { line ->
+            listOf(DEBIT_LABEL, CREDIT_LABEL).any { it.matches(line.text) } ||
+                listOf(INLINE_TO, INLINE_FROM).any { it.containsMatchIn(line.text) }
+        }
+        if (!hasAmount) return confirmed && hasReference
+        return listOf(confirmed, hasReference, namesParty).count { it } >= 2
     }
 
     /** True for text that could be a payment amount; used to merge extra OCR passes. */
