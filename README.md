@@ -132,12 +132,11 @@ npm run android      # terminal 2 – builds, installs and launches Spendd on th
 | `npm test` | Jest unit tests |
 | `npm run lint` | ESLint |
 
-## Secrets
+## Server
 
-- `src/secrets.ts` (git-ignored) holds `INSIGHTS_API_TOKEN`; copy `src/secrets.example.ts` to create it.
-  Use the same value as `SPENDD_APP_TOKEN` in `server/.env`. Generate one with `openssl rand -hex 32`.
-- A token in the app can always be extracted from the APK, so it only stops casual abuse; the server
-  also rate-limits per address.
+Sign-in, insights and categories all go through the Spendd server (`server/`, see its README). Debug
+builds reach it on this Mac through `adb reverse`; release builds use `PRODUCTION_API_URL` in
+`src/config.ts`, which must be HTTPS. The app keeps its sign-in token in the Android keystore.
 
 ## Release build
 

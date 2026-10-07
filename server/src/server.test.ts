@@ -2,20 +2,25 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
+import { signToken, UserStore } from './auth.ts';
 import type { InsightsRequest } from './contract.ts';
 import { UpstreamError } from './gemini.ts';
-import { createApp } from './server.ts';
+import { createApp, startKeepAlive } from './server.ts';
 
 let server: Server;
 let base = '';
 let mode: 'ok' | 'upstream' = 'ok';
 let received: InsightsRequest | null = null;
 let modelCalls: string[][] = [];
+let token = '';
+const JWT_SECRET = 'test-secret-that-is-at-least-32-chars';
 
 before(async () => {
   server = createServer(
     createApp({
-      appToken: 'secret',
+      users: await UserStore.open(null),
+      jwtSecret: JWT_SECRET,
+      clientIpHeader: 'cf-connecting-ip',
       model: {
         insights: async request => {
           received = request;
@@ -35,13 +40,16 @@ before(async () => {
   );
   await new Promise<void>(resolve => server.listen(0, resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  token = ((await (await auth('signup', { email: 'Asha@Example.com', password: 'correct horse' })).json()) as { token: string }).token;
 });
 after(() => server.close());
 
-const post = (body: unknown, token = 'secret', path = '/v1/insights') =>
+const auth = (action: 'signup' | 'login', body: unknown) =>
+  fetch(`${base}/v1/auth/${action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+const post = (body: unknown, bearer = token, path = '/v1/insights') =>
   fetch(`${base}${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-spendd-token': token },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 const valid = { month: 'October 2026', facts: [{ parameter: 'savings_rate', summary: 'You saved ₹11,100.', values: { savings: 11100 } }] };
@@ -63,7 +71,64 @@ test('rejects bad input, a wrong token and unknown routes', async () => {
   assert.equal((await post('{nope')).status, 400);
   assert.equal((await post({ month: 'x', facts: [] })).status, 400);
   assert.equal((await post(valid, 'wrong')).status, 401);
+  assert.equal((await fetch(`${base}/v1/insights`, { method: 'POST', body: '{}' })).status, 401);
   assert.equal((await fetch(`${base}/v1/other`, { method: 'POST' })).status, 404);
+});
+
+test('sign-in works with the same email in any case, and only with the right password', async () => {
+  const ok = await auth('login', { email: ' asha@example.com ', password: 'correct horse' });
+  assert.equal(ok.status, 200);
+  const body = (await ok.json()) as { token: string; user: { email: string } };
+  assert.equal(body.user.email, 'asha@example.com');
+  assert.equal((await post(valid, body.token)).status, 200);
+  assert.equal((await auth('login', { email: 'asha@example.com', password: 'wrong horse' })).status, 401);
+  assert.equal((await auth('login', { email: 'nobody@example.com', password: 'correct horse' })).status, 401);
+});
+
+test('sign-in attempts are limited per client address from the host header', async () => {
+  const attempt = (ip: string) =>
+    fetch(`${base}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+      body: JSON.stringify({ email: 'nobody@example.com', password: 'wrong horse' }),
+    });
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await attempt('203.0.113.9')).status, 401);
+  }
+  assert.equal((await attempt('203.0.113.9')).status, 429);
+  assert.equal((await attempt('198.51.100.4')).status, 401);
+});
+
+test('sign-up rejects a taken email, a bad email and a short password', async () => {
+  assert.equal((await auth('signup', { email: 'asha@example.com', password: 'another one' })).status, 409);
+  assert.equal((await auth('signup', { email: 'not-an-email', password: 'long enough' })).status, 400);
+  assert.equal((await auth('signup', { email: 'new@example.com', password: 'short' })).status, 400);
+});
+
+test('tokens: refresh gives a new one; forged, expired and unknown-account tokens are refused', async () => {
+  const refreshed = await fetch(`${base}/v1/auth/refresh`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  assert.equal(refreshed.status, 200);
+  const [, payload] = token.split('.');
+  const forged = signToken({ id: 'someone', email: 'x@y.z' }, 'a-different-secret-that-is-long-enough');
+  const expired = signToken({ id: JSON.parse(Buffer.from(payload, 'base64url').toString()).sub, email: 'asha@example.com' }, JWT_SECRET, Date.now() - 31 * 86_400_000);
+  const ghost = signToken({ id: 'deleted-account', email: 'gone@example.com' }, JWT_SECRET);
+  for (const bad of [forged, expired, ghost, `${token}x`]) {
+    assert.equal((await post(valid, bad)).status, 401);
+  }
+});
+
+test('keep-alive requests /health on the public URL', async () => {
+  let hits = 0;
+  const counter = createServer((req, res) => {
+    hits += req.url === '/health' ? 1 : 0;
+    res.end('{}');
+  });
+  await new Promise<void>(resolve => counter.listen(0, resolve));
+  const stop = startKeepAlive(`http://127.0.0.1:${(counter.address() as AddressInfo).port}/`, 20);
+  await new Promise(resolve => setTimeout(resolve, 110));
+  stop();
+  counter.close();
+  assert.ok(hits >= 3, `expected several pings, got ${hits}`);
 });
 
 test('model quota errors become 503 so the app retries later', async () => {
@@ -77,13 +142,13 @@ test('categorize asks the model once per merchant and shares the answer', async 
     { key: 'debit:upi:blinkit@hdfcbank', name: 'Blinkit', handle: 'blinkit@hdfcbank', amount: 432, hour: 21 },
     { key: 'debit:name:ravi kumar', name: 'Ravi Kumar', handle: null, amount: 300, hour: 10 },
   ];
-  const first = await (await post({ merchants }, 'secret', '/v1/categorize')).json() as { results: { key: string; cached: boolean }[] };
+  const first = await (await post({ merchants }, token, '/v1/categorize')).json() as { results: { key: string; cached: boolean }[] };
   assert.deepEqual(first.results.map(r => [r.key, r.cached]), [
     ['debit:upi:blinkit@hdfcbank', false],
     ['debit:name:ravi kumar', false],
   ]);
   // Another user later: Blinkit comes from the shared cache; the person was never cached.
-  const second = await (await post({ merchants }, 'secret', '/v1/categorize')).json() as { results: { key: string; cached: boolean }[] };
+  const second = await (await post({ merchants }, token, '/v1/categorize')).json() as { results: { key: string; cached: boolean }[] };
   assert.deepEqual(second.results.map(r => [r.key, r.cached]), [
     ['debit:upi:blinkit@hdfcbank', true],
     ['debit:name:ravi kumar', false],
@@ -92,7 +157,7 @@ test('categorize asks the model once per merchant and shares the answer', async 
 });
 
 test('categorize rejects bad input', async () => {
-  assert.equal((await post({ merchants: [] }, 'secret', '/v1/categorize')).status, 400);
-  assert.equal((await post({ merchants: [{ key: 'k' }] }, 'secret', '/v1/categorize')).status, 400);
-  assert.equal((await post({ merchants: [{ key: 'k', name: 'A' }, { key: 'k', name: 'B' }] }, 'secret', '/v1/categorize')).status, 400);
+  assert.equal((await post({ merchants: [] }, token, '/v1/categorize')).status, 400);
+  assert.equal((await post({ merchants: [{ key: 'k' }] }, token, '/v1/categorize')).status, 400);
+  assert.equal((await post({ merchants: [{ key: 'k', name: 'A' }, { key: 'k', name: 'B' }] }, token, '/v1/categorize')).status, 400);
 });

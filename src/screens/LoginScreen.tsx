@@ -7,11 +7,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { PrimaryButton, OutlineButton, TextButton } from '../components/Buttons';
+import { PrimaryButton, TextButton } from '../components/Buttons';
 import { Header } from '../components/Header';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
-import { signInWithEmail, signInWithGoogle, isAuthError } from '../auth/firebase';
+import { signInWithEmail, isAuthError } from '../auth/session';
 import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../theme';
 
 export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
@@ -21,7 +21,6 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -35,16 +34,6 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
     if (isAuthError(result)) {
       setError(result.message);
       return;
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setGoogleBusy(true);
-    const result = await signInWithGoogle();
-    setGoogleBusy(false);
-    if (isAuthError(result)) {
-      setError(result.message);
     }
   };
 
@@ -104,32 +93,10 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
                 onSubmitEditing={handleLogin}
               />
             </View>
-
-            <TextButton
-              label="Forgot password?"
-              color={c.inkMuted}
-              style={s.forgotLink}
-              onPress={() => navigation.navigate('ForgotPassword')}
-            />
           </View>
 
           <View style={s.actions}>
-            <PrimaryButton
-              label="Sign in"
-              onPress={handleLogin}
-              loading={busy}
-              disabled={googleBusy}
-            />
-            <View style={s.divider}>
-              <View style={s.dividerLine} />
-              <Text style={s.dividerText}>OR</Text>
-              <View style={s.dividerLine} />
-            </View>
-            <OutlineButton
-              label="Continue with Google"
-              onPress={handleGoogleSignIn}
-              disabled={busy || googleBusy}
-            />
+            <PrimaryButton label="Sign in" onPress={handleLogin} loading={busy} />
           </View>
 
           <View style={s.footer}>
@@ -172,11 +139,7 @@ const useStyles = makeStyles(c => ({
     borderBottomColor: c.line,
     paddingVertical: space[3],
   },
-  forgotLink: { alignSelf: 'flex-end', marginTop: -space[2] },
   actions: { gap: space[4], marginTop: space[8] },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  dividerLine: { flex: 1, height: 1, backgroundColor: c.line },
-  dividerText: { ...type.caption, letterSpacing: 1.5, color: c.inkSubtle },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

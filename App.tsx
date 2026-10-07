@@ -17,7 +17,6 @@ import { ConfirmPinScreen } from './src/screens/ConfirmPinScreen';
 import { ConsentScreen } from './src/screens/ConsentScreen';
 import { CreatePinScreen } from './src/screens/CreatePinScreen';
 import { EditProfileScreen } from './src/screens/EditProfileScreen';
-import { ForgotPasswordScreen } from './src/screens/ForgotPasswordScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
 import { IntroScreen } from './src/screens/IntroScreen';
 import { LegalScreen } from './src/screens/LegalScreen';
@@ -29,7 +28,7 @@ import { TransactionDetailsScreen } from './src/screens/TransactionDetailsScreen
 import { UnlockScreen } from './src/screens/UnlockScreen';
 import { clearAppState, isSetupComplete } from './src/storage/appState';
 import { clearSecureData, hasPin } from './src/storage/secure';
-import { getCurrentUser, onAuthStateChanged } from './src/auth/firebase';
+import { loadSession, onAuthStateChanged } from './src/auth/session';
 import { ThemeProvider, useTheme } from './src/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,7 +41,6 @@ const UNLOCKED_ROUTES: (keyof RootStackParamList)[] = [
   'Intro',
   'Login',
   'SignUp',
-  'ForgotPassword',
   'Consent',
   'CreatePin',
   'ConfirmPin',
@@ -82,34 +80,46 @@ function useRelock() {
 }
 
 
-async function resolveInitialRoute(): Promise<keyof RootStackParamList> {
-  const firebaseUser = getCurrentUser();
-  if (!firebaseUser) {
-    return 'Intro';
-  }
+/** Signed-out screens: the welcome screen and sign-in. Signing in moves on from these. */
+const AUTH_ROUTES: (keyof RootStackParamList)[] = ['Intro', 'Login', 'SignUp'];
+
+/** Where a signed-in user goes: unlock if this phone is set up, otherwise the rest of setup. */
+async function routeForSignedIn(): Promise<keyof RootStackParamList> {
   if ((await isSetupComplete()) && (await hasPin())) {
     return 'Unlock';
   }
-  // A setup abandoned midway restarts from scratch rather than leaving a stray PIN.
+  // A setup abandoned midway restarts from consent rather than leaving a stray PIN.
   await Promise.all([clearSecureData(), clearAppState()]);
-  return 'Intro';
+  return 'Consent';
 }
 
+async function resolveInitialRoute(): Promise<keyof RootStackParamList> {
+  return (await loadSession()) ? routeForSignedIn() : 'Intro';
+}
+
+/**
+ * Moves the app along when the account changes: signing in or signing up continues to setup
+ * or unlock; signing out returns to the welcome screen. Only acts on screens where that change
+ * matters, so it never interrupts setup or the app itself.
+ */
 function useAuthStateNavigation() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(async user => {
       if (!navigationRef.isReady()) {
         return;
       }
+      const route = navigationRef.getCurrentRoute()?.name;
+      const onAuthScreen = route != null && AUTH_ROUTES.includes(route);
       if (!user) {
-        navigationRef.reset({ index: 0, routes: [{ name: 'Intro' }] });
+        if (!onAuthScreen) {
+          navigationRef.reset({ index: 0, routes: [{ name: 'Intro' }] });
+        }
         return;
       }
-      if ((await isSetupComplete()) && (await hasPin())) {
-        navigationRef.reset({ index: 0, routes: [{ name: 'Unlock' }] });
-        return;
+      if (onAuthScreen) {
+        const next = await routeForSignedIn();
+        navigationRef.reset({ index: 0, routes: [{ name: next }] });
       }
-      navigationRef.reset({ index: 0, routes: [{ name: 'Intro' }] });
     });
     return unsubscribe;
   }, []);
@@ -153,7 +163,6 @@ function AppRoot() {
             <Stack.Screen name="Intro" component={IntroScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="SignUp" component={SignUpScreen} />
-            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
             <Stack.Screen name="Consent" component={ConsentScreen} />
             <Stack.Screen name="CreatePin" component={CreatePinScreen} />
             <Stack.Screen name="ConfirmPin" component={ConfirmPinScreen} />

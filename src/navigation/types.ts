@@ -7,7 +7,6 @@ export type RootStackParamList = {
   Intro: undefined;
   Login: undefined;
   SignUp: undefined;
-  ForgotPassword: undefined;
   Consent: undefined;
   CreatePin: undefined;
   ConfirmPin: { pin: string };

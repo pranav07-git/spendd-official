@@ -1,4 +1,7 @@
-# Spendd insights server
+# Spendd server
+
+Email + password accounts (JWT sessions), plus insights and categories from Gemini.
+
 
 Turns the phone's computed spending facts into structured insights and money stories with
 **Gemini 3.5 Flash-Lite** (set `GEMINI_MODEL` to change it; 2.5 Flash-Lite is no longer offered to new API keys). The app never sends screenshots, raw transactions, or the names or UPI IDs of
@@ -37,9 +40,27 @@ From the phone (debug build), forward the port so the app's `http://localhost:87
 adb reverse tcp:8787 tcp:8787
 ```
 
-`SPENDD_APP_TOKEN` is required (the server won't start without it; `SPENDD_ALLOW_NO_TOKEN=1` is for local tests only). Put the same value in `INSIGHTS_API_TOKEN` in the app's `src/config.ts`. The server listens on `127.0.0.1` only; set `HOST=0.0.0.0` when deploying it behind HTTPS.
+`JWT_SECRET` is required (at least 32 random characters: `openssl rand -hex 32`). The server listens on `127.0.0.1` only; set `HOST=0.0.0.0` when deploying it behind HTTPS. To deploy it on Render or Google Cloud, see [DEPLOY.md](DEPLOY.md).
 
 ## API
+
+### Accounts
+
+`POST /v1/auth/signup` and `POST /v1/auth/login`, both with `{ "email": "...", "password": "..." }`
+(email is case-insensitive; password 8–128 characters)
+
+→ `{ "token", "expiresAt", "user": { "id", "email" } }` (`201` on sign-up)
+
+Errors: `400` bad email or password, `401` `invalid_credentials`, `409` `email_taken`, `429` more than 10
+attempts / 10 min per address.
+
+`POST /v1/auth/refresh` with a valid token → a fresh one (same shape). Tokens are HS256 JWTs that last 30
+days. Every other `/v1` call needs `Authorization: Bearer <token>`, and answers `401` without a valid one.
+
+Passwords are hashed with scrypt. Accounts are kept in `data/users.json` (git-ignored; back it up).
+There is no password reset yet: it needs an email provider to send reset links.
+
+### `POST /v1/insights`
 
 `POST /v1/insights`
 
@@ -53,7 +74,7 @@ adb reverse tcp:8787 tcp:8787
 
 → `{ "insights": [{ "parameter", "title", "detail", "action", "tone" }], "stories": [{ "parameter", "text" }], "model" }`
 
-Errors: `400` bad request, `401` wrong token, `429` rate limited (30 requests / 10 min per address),
+Errors: `400` bad request, `401` missing or invalid token, `429` rate limited (30 requests / 10 min per account),
 `502`/`503` model unavailable. `GET /health` for monitoring.
 
 ### `POST /v1/categorize`
@@ -81,6 +102,6 @@ npm run typecheck
 
 ## Before production
 
-- Host it behind HTTPS and put that URL in `INSIGHTS_API_URL` (release builds block plain HTTP).
-- Replace the shared app token with real per-user auth; the in-memory rate limit is per process.
+- Host it behind HTTPS and put that URL in `PRODUCTION_API_URL` in the app's `src/config.ts` (release builds block plain HTTP).
+- Run one instance: accounts and the merchant cache are files, and the rate limit is in memory.
 - Disclose cloud processing in the privacy policy and Play Data safety form.

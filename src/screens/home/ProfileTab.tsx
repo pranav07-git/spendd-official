@@ -14,7 +14,7 @@ import { transactionsToCsv } from '../../transactions/csv';
 import { formatDate, formatRupees } from '../../transactions/format';
 import { clearTransactions } from '../../transactions/store';
 import type { Transaction } from '../../transactions/types';
-import { signOut } from '../../auth/firebase';
+import { signOut } from '../../auth/session';
 import {
   makeStyles,
   SCREEN_PADDING,

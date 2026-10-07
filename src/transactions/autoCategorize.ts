@@ -1,4 +1,4 @@
-import { INSIGHTS_API_TOKEN, INSIGHTS_API_URL } from '../config';
+import { apiFetch } from '../auth/session';
 import { getCategoryMemory, rememberCategory } from '../storage/categoryMemory';
 import { kindFor } from './categories';
 import { planCategorization } from './categorizePlan';
@@ -7,31 +7,14 @@ import { applyCategory } from './store';
 import { UNCLEAR } from './stories';
 import type { Transaction } from './types';
 
-const TIMEOUT_MS = 20_000;
-
 type Answer = { key: string; category: string; confidence: 'high' | 'medium' | 'low'; isPerson: boolean };
 
 async function askSpenddAi(queries: MerchantQuery[]): Promise<Answer[]> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (INSIGHTS_API_TOKEN) {
-    headers['x-spendd-token'] = INSIGHTS_API_TOKEN;
+  const res = await apiFetch('/v1/categorize', { method: 'POST', body: JSON.stringify({ merchants: queries }) });
+  if (!res.ok) {
+    throw new Error(`Categorize returned ${res.status}`);
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(`${INSIGHTS_API_URL}/v1/categorize`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ merchants: queries }),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      throw new Error(`Categorize returned ${res.status}`);
-    }
-    return ((await res.json()) as { results: Answer[] }).results;
-  } finally {
-    clearTimeout(timer);
-  }
+  return ((await res.json()) as { results: Answer[] }).results;
 }
 
 let running: Promise<number> | null = null;

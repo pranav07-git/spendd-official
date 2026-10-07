@@ -7,11 +7,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { PrimaryButton, OutlineButton, TextButton } from '../components/Buttons';
+import { PrimaryButton, TextButton } from '../components/Buttons';
 import { Header } from '../components/Header';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
-import { signUpWithEmail, signInWithGoogle, isAuthError } from '../auth/firebase';
+import { MIN_PASSWORD, signUpWithEmail, isAuthError } from '../auth/session';
 import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../theme';
 
 export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
@@ -22,7 +22,6 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
 
   const passwordRef = useRef<any>(null);
   const confirmRef = useRef<any>(null);
@@ -32,8 +31,8 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
       setError('Please fill in all fields.');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (password.length < MIN_PASSWORD) {
+      setError(`Password must be at least ${MIN_PASSWORD} characters.`);
       return;
     }
     if (password !== confirmPassword) {
@@ -47,16 +46,6 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
     if (isAuthError(result)) {
       setError(result.message);
       return;
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setGoogleBusy(true);
-    const result = await signInWithGoogle();
-    setGoogleBusy(false);
-    if (isAuthError(result)) {
-      setError(result.message);
     }
   };
 
@@ -107,7 +96,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
                   setPassword(v);
                   setError(null);
                 }}
-                placeholder="Min. 6 characters"
+                placeholder={`Min. ${MIN_PASSWORD} characters`}
                 placeholderTextColor={c.inkSubtle}
                 secureTextEntry
                 autoCapitalize="none"
@@ -142,22 +131,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
           </View>
 
           <View style={s.actions}>
-            <PrimaryButton
-              label="Create account"
-              onPress={handleSignUp}
-              loading={busy}
-              disabled={googleBusy}
-            />
-            <View style={s.divider}>
-              <View style={s.dividerLine} />
-              <Text style={s.dividerText}>OR</Text>
-              <View style={s.dividerLine} />
-            </View>
-            <OutlineButton
-              label="Continue with Google"
-              onPress={handleGoogleSignIn}
-              disabled={busy || googleBusy}
-            />
+            <PrimaryButton label="Create account" onPress={handleSignUp} loading={busy} />
           </View>
 
           <View style={s.footer}>
@@ -205,9 +179,6 @@ const useStyles = makeStyles(c => ({
     paddingVertical: space[3],
   },
   actions: { gap: space[4], marginTop: space[8] },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  dividerLine: { flex: 1, height: 1, backgroundColor: c.line },
-  dividerText: { ...type.caption, letterSpacing: 1.5, color: c.inkSubtle },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

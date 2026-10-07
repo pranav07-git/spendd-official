@@ -1,0 +1,24 @@
+# Render Blueprint for the Spendd server (see server/DEPLOY.md).
+services:
+  - type: web
+    name: spendd-server
+    runtime: docker
+    # Free plan: the server pings its own /health every 10 minutes (RENDER_EXTERNAL_URL) so it doesn't
+    # sleep. Its files are wiped on every deploy or restart, accounts in users.json included.
+    plan: free
+    region: singapore
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    # Only server changes redeploy it.
+    buildFilter:
+      paths:
+        - server/**
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip
