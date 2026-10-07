@@ -18,6 +18,7 @@ import { ConsentScreen } from './src/screens/ConsentScreen';
 import { CreatePinScreen } from './src/screens/CreatePinScreen';
 import { EditProfileScreen } from './src/screens/EditProfileScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
+import { InsightsScreen } from './src/screens/InsightsScreen';
 import { IntroScreen } from './src/screens/IntroScreen';
 import { LegalScreen } from './src/screens/LegalScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
@@ -25,6 +26,7 @@ import { SetBudgetScreen } from './src/screens/SetBudgetScreen';
 import { SignUpScreen } from './src/screens/SignUpScreen';
 import { StoryScreen } from './src/screens/StoryScreen';
 import { TransactionDetailsScreen } from './src/screens/TransactionDetailsScreen';
+import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { UnlockScreen } from './src/screens/UnlockScreen';
 import { clearAppState, isSetupComplete } from './src/storage/appState';
 import { clearSecureData, hasPin } from './src/storage/secure';
@@ -169,6 +171,8 @@ function AppRoot() {
             <Stack.Screen name="Biometric" component={BiometricScreen} />
             <Stack.Screen name="Unlock" component={UnlockScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Transactions" component={TransactionsScreen} />
+            <Stack.Screen name="Insights" component={InsightsScreen} />
             <Stack.Screen name="TransactionDetails" component={TransactionDetailsScreen} />
             <Stack.Screen name="AddTransaction" component={AddTransactionScreen} />
             <Stack.Screen name="Story" component={StoryScreen} options={{ animation: 'fade' }} />

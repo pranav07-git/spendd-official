@@ -71,7 +71,8 @@ type Props = {
   /** Loaded and kept fresh by HomeScreen; null until the first load. */
   transactions: Transaction[] | null;
   onReload: () => Promise<void>;
-  onBack: () => void;
+  /** Only on the Transactions page; as a tab there's nothing to go back to. */
+  onBack?: () => void;
   onOpen: (transaction: Transaction) => void;
   onAdd: () => void;
   onToast: (message: string) => void;
@@ -132,13 +133,17 @@ export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd,
   return (
     <View style={s.root}>
       <View style={s.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to home"
-          onPress={onBack}
-          style={({ pressed }) => [s.iconButton, pressed && s.pressed]}>
-          <ChevronLeftIcon size={24} color={c.ink} strokeWidth={2} />
-        </Pressable>
+        {onBack ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            onPress={onBack}
+            style={({ pressed }) => [s.iconButton, pressed && s.pressed]}>
+            <ChevronLeftIcon size={24} color={c.ink} strokeWidth={2} />
+          </Pressable>
+        ) : (
+          <View style={s.iconButton} />
+        )}
         <Text style={s.title} accessibilityRole="header">
           Transactions
         </Text>

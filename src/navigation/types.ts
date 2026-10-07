@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LegalDoc } from '../legal/documents';
-import type { TabKey } from '../screens/home/TabBar';
+import type { Insight } from '../insights/types';
 import type { Transaction } from '../transactions/types';
 
 export type RootStackParamList = {
@@ -12,11 +12,14 @@ export type RootStackParamList = {
   ConfirmPin: { pin: string };
   Biometric: undefined;
   Unlock: undefined;
-  /** Optionally opens a tab, with a search filled in on Transactions. */
-  Home: { tab?: TabKey; query?: string } | undefined;
+  Home: undefined;
+  /** All transactions on a page of their own, optionally with a search filled in. */
+  Transactions: { query?: string } | undefined;
+  /** Every insight, opened from Home's "See all". */
+  Insights: { items: Insight[]; written: boolean };
   TransactionDetails: { transaction: Transaction };
   AddTransaction: undefined;
-  /** Index into monthlyStory(): the month's categories, then income, then payments to place. */
+  /** Index into monthlyStory(): the month's categories, then income. */
   Story: { startIndex: number };
   SetBudget: undefined;
   EditProfile: undefined;

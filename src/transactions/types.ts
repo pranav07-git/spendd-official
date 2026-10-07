@@ -19,7 +19,7 @@ export type Transaction = {
   /** Entered by hand on the Add Transaction screen rather than read from a screenshot. */
   manual?: boolean;
   note?: string | null;
-  /** Set once the user has answered "what was this payment for?" so the story stops asking. */
+  /** Set once the user has picked this payment's category, so Spendd AI leaves it alone. */
   categoryConfirmed?: boolean;
   /** Who set the category: the keyword rules at logging time, the user, the user's past choice, or Spendd AI. */
   categorySource?: 'rules' | 'user' | 'memory' | 'ai';

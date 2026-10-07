@@ -5,7 +5,8 @@ import { Header } from './Header';
 import { AccountIcon, BackspaceIcon } from './Icons';
 import { Screen } from './Screen';
 import { TextButton } from './Buttons';
-import { PIN_LENGTH, USER_NAME } from '../config';
+import { PIN_LENGTH } from '../config';
+import { useFirstName } from '../storage/useFirstName';
 import { fontFamily, makeStyles, space, type, useTheme } from '../theme';
 
 type PinEntryProps = {
@@ -17,6 +18,7 @@ type PinEntryProps = {
   onForgot: () => void;
   /** Optional content for the otherwise empty bottom-left key (e.g. biometric unlock). */
   bottomLeftKey?: ReactNode;
+  /** Defaults to "Hi <first name>," from the profile. */
   greeting?: string;
 };
 
@@ -36,8 +38,11 @@ export function PinEntry({
   onComplete,
   onForgot,
   bottomLeftKey,
-  greeting = `Hi ${USER_NAME},`,
+  greeting: greetingProp,
 }: PinEntryProps) {
+  const name = useFirstName();
+  // Blank while the name loads, so it doesn't flash "Hi there" first.
+  const greeting = greetingProp ?? (name === null ? ' ' : name ? `Hi ${name},` : 'Hi there,');
   const styles = useStyles();
   const { c } = useTheme();
   const [pin, setPin] = useState('');

@@ -28,7 +28,7 @@ test('an empty month has one empty slide', () => {
   expect(monthlyStory([], NOW)).toEqual([{ kind: 'empty' }]);
 });
 
-test('category slides, then income, then questions', () => {
+test('category slides, then income; it never asks what a payment was for', () => {
   const slides = monthlyStory(
     [
       tx({ category: 'Groceries', amount: 332, occurredAt: at(10, 2) }),
@@ -43,11 +43,11 @@ test('category slides, then income, then questions', () => {
     ],
     NOW,
   );
-  // The confirmed ₹80 personal payment counts as its own category; the unconfirmed one is a question.
-  expect(slides.map(s => s.kind)).toEqual(['category', 'category', 'category', 'income', 'question']);
+  // Both personal payments count under Personal, confirmed or not.
+  expect(slides.map(s => s.kind)).toEqual(['category', 'category', 'category', 'income']);
 
-  const [food, groceries, personal, income, question] = slides as any[];
-  expect(personal).toEqual(expect.objectContaining({ category: 'Personal', amount: 80, position: 2, of: 3 }));
+  const [food, personal, groceries, income] = slides as any[];
+  expect(personal).toEqual(expect.objectContaining({ category: 'Personal', amount: 380, position: 1, of: 3 }));
   // Food this month 520; this week only the two recent orders.
   expect(food).toEqual(
     expect.objectContaining({ category: 'Food', amount: 520, count: 2, total: 120, period: 'week', position: 0, of: 3 }),
@@ -55,8 +55,6 @@ test('category slides, then income, then questions', () => {
   // No groceries this week, so the card falls back to the month.
   expect(groceries).toEqual(expect.objectContaining({ category: 'Groceries', count: 1, total: 332, period: 'month' }));
   expect(income).toEqual({ kind: 'income', total: 6000, top: { label: 'Salary', amount: 5000, category: 'Salary' } });
-  expect(question.tx.counterparty).toBe('Ravi');
-  expect(question.suggestions).toEqual(['Food', 'Groceries']);
 });
 
 test('category lines read naturally', () => {
@@ -80,14 +78,14 @@ test('confirmed personal payments get their own slide instead of an empty story'
   expect(categoryLine('Personal', 2, 'week')).toBe('you paid people twice this week');
 });
 
-test('unconfirmed personal payments are asked about, confirmed ones are counted', () => {
-  const kinds = monthlyStory(
+test('a payment Spendd AI placed shows under its category; an unplaced one stays under Other', () => {
+  const slides = monthlyStory(
     [
-      tx({ category: 'Personal', amount: 70, occurredAt: at(10, 5), categoryConfirmed: true }),
-      tx({ category: 'Personal', amount: 30, occurredAt: at(10, 6) }),
+      tx({ category: 'Groceries', categorySource: 'ai', amount: 432, occurredAt: at(10, 14) }),
+      tx({ category: 'Other', amount: 30, occurredAt: at(10, 6) }),
     ],
     NOW,
-  ).map(s => s.kind);
-  expect(kinds).toEqual(['category', 'question']);
+  );
+  expect(slides.map(s => (s.kind === 'category' ? s.category : s.kind))).toEqual(['Groceries', 'Other']);
 });
 

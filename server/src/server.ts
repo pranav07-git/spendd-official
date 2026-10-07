@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import { access, mkdir } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
-import { AuthError, bearerToken, parseCredentials, publicUser, signToken, TOKEN_TTL_S, UserStore, verifyToken, type User } from './auth.ts';
+import { AuthError, bearerToken, parseCredentials, parseName, publicUser, signToken, TOKEN_TTL_S, UserStore, verifyToken, type User } from './auth.ts';
 import { MerchantCache, parseCategorizeRequest, type MerchantAnswer, type MerchantQuery } from './categorize.ts';
 import { BadRequest, parseRequest, type InsightsRequest, type InsightsResponse } from './contract.ts';
 import { createGenerator, MODEL, UpstreamError } from './gemini.ts';
@@ -125,9 +125,10 @@ export function createApp({ model, users, jwtSecret, cache = new MerchantCache(n
         if (!allowAuth(clientAddress(req))) {
           return send(res, 429, { error: 'rate_limited' });
         }
-        const { email, password } = parseCredentials(await readJson(req));
+        const body = await readJson(req);
+        const { email, password } = parseCredentials(body);
         if (route === '/v1/auth/signup') {
-          return send(res, 201, session(await users.create(email, password)));
+          return send(res, 201, session(await users.create(email, password, parseName(body))));
         }
         return send(res, 200, session(await users.authenticate(email, password)));
       }

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { USER_NAME } from '../config';
+import { getCurrentUser } from '../auth/session';
 import type { Insight } from '../insights/types';
 import type { Budget } from '../transactions/budget';
 
@@ -52,12 +52,17 @@ export type Profile = {
   avatar: string | null;
 };
 
-export const DEFAULT_PROFILE: Profile = { name: USER_NAME, avatar: null };
+export const DEFAULT_PROFILE: Profile = { name: '', avatar: null };
 
+/** The profile on this phone; until the user edits their name, it's the one they signed up with. */
 export async function getProfile(): Promise<Profile> {
   const raw = await AsyncStorage.getItem(KEYS.profile);
-  return raw ? { ...DEFAULT_PROFILE, ...(JSON.parse(raw) as Partial<Profile>) } : DEFAULT_PROFILE;
+  const saved = raw ? { ...DEFAULT_PROFILE, ...(JSON.parse(raw) as Partial<Profile>) } : DEFAULT_PROFILE;
+  return { ...saved, name: saved.name.trim() || getCurrentUser()?.name?.trim() || '' };
 }
+
+/** "Asha Verma" → "Asha", for greetings. */
+export const firstName = (name: string): string => name.trim().split(/\s+/)[0] ?? '';
 
 export async function saveProfile(profile: Profile): Promise<void> {
   await AsyncStorage.setItem(KEYS.profile, JSON.stringify(profile));

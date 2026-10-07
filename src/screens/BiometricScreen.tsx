@@ -5,13 +5,14 @@ import { Header } from '../components/Header';
 import { FingerprintIcon } from '../components/Icons';
 import { Card, StoryHeader } from '../components/Layout';
 import { Screen } from '../components/Screen';
-import { USER_NAME } from '../config';
 import type { ScreenProps } from '../navigation/types';
 import { markSetupComplete } from '../storage/appState';
+import { useFirstName } from '../storage/useFirstName';
 import { enableBiometrics, getBiometryType } from '../storage/secure';
 import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../theme';
 
 export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
+  const name = useFirstName();
   const s = useStyles();
   const { c } = useTheme();
   const [busy, setBusy] = useState(false);
@@ -57,7 +58,7 @@ export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
 
       <View style={s.body}>
         <StoryHeader
-          story={`Hi ${USER_NAME}, open Spendd with a touch.`}
+          story={name ? `Hi ${name}, open Spendd with a touch.` : 'Open Spendd with a touch.'}
           caption="Faster than your PIN, and just as safe. You can still use your PIN any time."
         />
 

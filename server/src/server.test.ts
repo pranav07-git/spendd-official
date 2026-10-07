@@ -40,7 +40,7 @@ before(async () => {
   );
   await new Promise<void>(resolve => server.listen(0, resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  token = ((await (await auth('signup', { email: 'Asha@Example.com', password: 'correct horse' })).json()) as { token: string }).token;
+  token = ((await (await auth('signup', { name: 'Asha  Verma', email: 'Asha@Example.com', password: 'correct horse' })).json()) as { token: string }).token;
 });
 after(() => server.close());
 
@@ -78,8 +78,10 @@ test('rejects bad input, a wrong token and unknown routes', async () => {
 test('sign-in works with the same email in any case, and only with the right password', async () => {
   const ok = await auth('login', { email: ' asha@example.com ', password: 'correct horse' });
   assert.equal(ok.status, 200);
-  const body = (await ok.json()) as { token: string; user: { email: string } };
+  const body = (await ok.json()) as { token: string; user: { email: string; name: string } };
   assert.equal(body.user.email, 'asha@example.com');
+  // The name given at sign-up comes back on every sign-in, so a new phone can greet the user.
+  assert.equal(body.user.name, 'Asha Verma');
   assert.equal((await post(valid, body.token)).status, 200);
   assert.equal((await auth('login', { email: 'asha@example.com', password: 'wrong horse' })).status, 401);
   assert.equal((await auth('login', { email: 'nobody@example.com', password: 'correct horse' })).status, 401);
@@ -100,9 +102,14 @@ test('sign-in attempts are limited per client address from the host header', asy
 });
 
 test('sign-up rejects a taken email, a bad email and a short password', async () => {
-  assert.equal((await auth('signup', { email: 'asha@example.com', password: 'another one' })).status, 409);
-  assert.equal((await auth('signup', { email: 'not-an-email', password: 'long enough' })).status, 400);
-  assert.equal((await auth('signup', { email: 'new@example.com', password: 'short' })).status, 400);
+  assert.equal((await auth('signup', { name: 'Asha', email: 'asha@example.com', password: 'another one' })).status, 409);
+  assert.equal((await auth('signup', { name: 'New', email: 'not-an-email', password: 'long enough' })).status, 400);
+  assert.equal((await auth('signup', { name: 'New', email: 'new@example.com', password: 'short' })).status, 400);
+  assert.equal((await auth('signup', { name: '   ', email: 'new@example.com', password: 'long enough' })).status, 400);
+  // The 1.0 app sends no name; it can still sign up, and has none.
+  const old = await auth('signup', { email: 'old-app@example.com', password: 'long enough' });
+  assert.equal(old.status, 201);
+  assert.equal(((await old.json()) as { user: { name: string | null } }).user.name, null);
 });
 
 test('tokens: refresh gives a new one; forged, expired and unknown-account tokens are refused', async () => {

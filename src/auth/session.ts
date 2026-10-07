@@ -18,7 +18,8 @@ export const MIN_PASSWORD = 8;
 // Types
 // ---------------------------------------------------------------------------
 
-export type AuthUser = { id: string; email: string };
+/** `name` is the one given at sign-up (null for accounts made before names were asked for). */
+export type AuthUser = { id: string; email: string; name: string | null };
 
 export type AuthError = {
   /** Human-readable message safe to display in the UI. */
@@ -150,7 +151,10 @@ const MESSAGES: Record<string, string> = {
   rate_limited: 'Too many attempts. Try again in a few minutes.',
 };
 
-async function authenticate(action: 'signup' | 'login', email: string, password: string): Promise<AuthUser | AuthError> {
+async function authenticate(
+  action: 'signup' | 'login',
+  credentials: { email: string; password: string; name?: string },
+): Promise<AuthUser | AuthError> {
   if (!API_URL) {
     return { code: 'not-configured', message: 'Sign-in isn’t available in this build yet.' };
   }
@@ -158,7 +162,7 @@ async function authenticate(action: 'signup' | 'login', email: string, password:
   try {
     res = await apiFetch(`/v1/auth/${action}`, {
       method: 'POST',
-      body: JSON.stringify({ email: email.trim(), password }),
+      body: JSON.stringify({ ...credentials, email: credentials.email.trim(), name: credentials.name?.trim() }),
     });
   } catch {
     return { code: 'network', message: 'Can’t reach Spendd. Check your connection.' };
@@ -172,18 +176,21 @@ async function authenticate(action: 'signup' | 'login', email: string, password:
   if (code === 'bad_request' && body.message?.startsWith('email')) {
     return { code, message: 'Enter a valid email address.' };
   }
+  if (code === 'bad_request' && body.message?.startsWith('name')) {
+    return { code, message: 'Enter your name.' };
+  }
   if (code === 'bad_request' && body.message?.startsWith('password')) {
     return { code, message: `Password must be at least ${MIN_PASSWORD} characters.` };
   }
   return { code, message: MESSAGES[code] ?? 'Something went wrong. Try again.' };
 }
 
-/** Creates a new account with email + password and signs in to it. */
-export function signUpWithEmail(email: string, password: string): Promise<AuthUser | AuthError> {
-  return authenticate('signup', email, password);
+/** Creates a new account with a name, email and password, and signs in to it. */
+export function signUpWithEmail(name: string, email: string, password: string): Promise<AuthUser | AuthError> {
+  return authenticate('signup', { name, email, password });
 }
 
 /** Signs in an existing account with email + password. */
 export function signInWithEmail(email: string, password: string): Promise<AuthUser | AuthError> {
-  return authenticate('login', email, password);
+  return authenticate('login', { email, password });
 }

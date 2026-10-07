@@ -17,17 +17,19 @@ import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../th
 export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
   const s = useStyles();
   const { c } = useTheme();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const emailRef = useRef<any>(null);
   const passwordRef = useRef<any>(null);
   const confirmRef = useRef<any>(null);
 
   const handleSignUp = async () => {
-    if (!email.trim() || !password || !confirmPassword) {
+    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
       setError('Please fill in all fields.');
       return;
     }
@@ -41,7 +43,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
     }
     setError(null);
     setBusy(true);
-    const result = await signUpWithEmail(email, password);
+    const result = await signUpWithEmail(name, email, password);
     setBusy(false);
     if (isAuthError(result)) {
       setError(result.message);
@@ -66,8 +68,30 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
 
           <View style={s.form}>
             <View style={s.field}>
+              <Text style={s.label}>NAME</Text>
+              <TextInput
+                style={s.input}
+                value={name}
+                onChangeText={v => {
+                  setName(v);
+                  setError(null);
+                }}
+                placeholder="What should we call you?"
+                placeholderTextColor={c.inkSubtle}
+                maxLength={60}
+                autoCapitalize="words"
+                autoCorrect={false}
+                autoComplete="name"
+                textContentType="name"
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+              />
+            </View>
+
+            <View style={s.field}>
               <Text style={s.label}>EMAIL</Text>
               <TextInput
+                ref={emailRef}
                 style={s.input}
                 value={email}
                 onChangeText={v => {

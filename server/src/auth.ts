@@ -19,8 +19,9 @@ export class AuthError extends Error {
   }
 }
 
-export type User = { id: string; email: string; passwordHash: string; createdAt: number };
-export type PublicUser = { id: string; email: string };
+/** `name` is what the user typed at sign-up; accounts made before names existed have none. */
+export type User = { id: string; email: string; name?: string; passwordHash: string; createdAt: number };
+export type PublicUser = { id: string; email: string; name: string | null };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -36,6 +37,24 @@ export function parseCredentials(body: unknown): { email: string; password: stri
     throw new BadRequest(`password must be ${MIN_PASSWORD}–${MAX_PASSWORD} characters`);
   }
   return { email, password: body.password };
+}
+
+const MAX_NAME = 60;
+
+/**
+ * The display name sent with a sign-up, one line with spaces tidied. The app asks for it, but the
+ * 1.0 build didn't send one, so it may be missing; if it's sent, it must be a real name.
+ */
+export function parseName(body: unknown): string | undefined {
+  if (!isRecord(body) || body.name === undefined) {
+    return undefined;
+  }
+  const raw = typeof body.name === 'string' ? body.name : '';
+  const name = raw.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (name.length === 0 || name.length > MAX_NAME) {
+    throw new BadRequest(`name must be 1–${MAX_NAME} characters`);
+  }
+  return name;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +97,7 @@ export type Claims = { sub: string; email: string; iat: number; exp: number };
 const HEADER = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
 const sign = (input: string, secret: string) => createHmac('sha256', secret).update(input).digest();
 
-export function signToken(user: PublicUser, secret: string, now = Date.now()): string {
+export function signToken(user: Pick<PublicUser, 'id' | 'email'>, secret: string, now = Date.now()): string {
   const iat = Math.floor(now / 1000);
   const claims: Claims = { sub: user.id, email: user.email, iat, exp: iat + TOKEN_TTL_S };
   const body = `${HEADER}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}`;
@@ -146,7 +165,7 @@ export class UserStore {
     return this.byId.get(id) ?? null;
   }
 
-  async create(email: string, password: string): Promise<User> {
+  async create(email: string, password: string, name: string | undefined): Promise<User> {
     if (this.byEmail.has(email)) {
       throw new AuthError(409, 'email_taken');
     }
@@ -155,7 +174,7 @@ export class UserStore {
     if (this.byEmail.has(email)) {
       throw new AuthError(409, 'email_taken');
     }
-    const user: User = { id: randomUUID(), email, passwordHash, createdAt: Date.now() };
+    const user: User = { id: randomUUID(), email, name, passwordHash, createdAt: Date.now() };
     this.add(user);
     await this.save();
     return user;
@@ -191,4 +210,4 @@ export class UserStore {
   }
 }
 
-export const publicUser = (u: User): PublicUser => ({ id: u.id, email: u.email });
+export const publicUser = (u: User): PublicUser => ({ id: u.id, email: u.email, name: u.name ?? null });

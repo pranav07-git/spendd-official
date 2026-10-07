@@ -4,14 +4,12 @@ import { PinEntry } from '../components/PinEntry';
 import { FingerprintIcon } from '../components/Icons';
 import type { ScreenProps } from '../navigation/types';
 import { useTheme } from '../theme';
-import { getProfile } from '../storage/appState';
 import { wipeAllData } from '../storage/reset';
 import { checkPin as checkStoredPin, isBiometricsEnabled, pinCheckMessage, unlockWithBiometrics } from '../storage/secure';
 
 export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
   const { c } = useTheme();
   const [biometrics, setBiometrics] = useState(false);
-  const [name, setName] = useState<string | null>(null);
 
   const goHome = useCallback(
     () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }),
@@ -23,12 +21,6 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
       goHome();
     }
   }, [goHome]);
-
-  useEffect(() => {
-    getProfile()
-      .then(profile => setName(profile.name))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     isBiometricsEnabled().then(enabled => {
@@ -69,7 +61,6 @@ export function UnlockScreen({ navigation }: ScreenProps<'Unlock'>) {
     <PinEntry
       title="Enter PIN"
       subtitle="Enter your 4-digit access PIN"
-      greeting={name ? `Hi ${name},` : undefined}
       onComplete={checkPin}
       onForgot={resetApp}
       bottomLeftKey={

@@ -1,30 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, PanResponder, Pressable, Text, useWindowDimensions, View, type PanResponderGestureState } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { OutlineButton, PrimaryButton, TextButton } from '../components/Buttons';
+import { OutlineButton, PrimaryButton } from '../components/Buttons';
 import { CategoryGlyph } from '../components/CategoryGlyph';
 import { CrossIcon } from '../components/Icons';
 import { Screen } from '../components/Screen';
 import type { ScreenProps } from '../navigation/types';
-import { kindFor } from '../transactions/categories';
-import { addDays, formatDayMonth, formatRupees, formatTime, startOfDay } from '../transactions/format';
-import { listTransactions, updateTransaction } from '../transactions/store';
+import { formatRupees } from '../transactions/format';
+import { listTransactions } from '../transactions/store';
 import { categoryLine, monthlyStory, type StorySlide } from '../transactions/stories';
-import type { Transaction } from '../transactions/types';
 import { elevation, makeStyles, radius, SCREEN_PADDING, space, TOUCH_TARGET, type, useTheme } from '../theme';
 import { FadeIn } from './home/HomeSections';
 
 const SLIDE_MS = 6000;
-
-/** "Today at 10:52 am to Ravi" */
-function whenAndWho(tx: Transaction): string {
-  const day = startOfDay(tx.occurredAt);
-  const today = startOfDay(Date.now());
-  const date = day === today ? 'Today' : day === addDays(today, -1) ? 'Yesterday' : formatDayMonth(tx.occurredAt);
-  const time = tx.hasTime ? ` at ${formatTime(tx.occurredAt)}` : '';
-  const who = tx.counterparty ? ` to ${tx.counterparty}` : '';
-  return `${date}${time}${who}`;
-}
 
 const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -57,45 +45,29 @@ function Headline({ slide }: { slide: StorySlide }) {
       </View>
     );
   }
-  if (slide.kind === 'income') {
-    return (
-      <View style={s.centre}>
-        <View style={[s.glyphCircle, s.glyphIncome]}>
-          <CategoryGlyph category="Income" size={28} />
-        </View>
-        <Text style={s.eyebrow}>This month</Text>
-        <Text style={s.storyWord}>Income</Text>
-        <Text style={[s.body, s.bodyGap]}>You earned</Text>
-        <Text style={[s.hero, s.heroIncome]} adjustsFontSizeToFit numberOfLines={1}>
-          {formatRupees(slide.total)}
-        </Text>
-      </View>
-    );
-  }
   return (
     <View style={s.centre}>
-      <Text style={s.eyebrow}>A few to sort</Text>
-      <Text style={s.storyWord}>What was this payment for?</Text>
-      <Text style={[s.hero, s.bodyGap]} adjustsFontSizeToFit numberOfLines={1}>
-        {formatRupees(slide.tx.amount)}
+      <View style={[s.glyphCircle, s.glyphIncome]}>
+        <CategoryGlyph category="Income" size={28} />
+      </View>
+      <Text style={s.eyebrow}>This month</Text>
+      <Text style={s.storyWord}>Income</Text>
+      <Text style={[s.body, s.bodyGap]}>You earned</Text>
+      <Text style={[s.hero, s.heroIncome]} adjustsFontSizeToFit numberOfLines={1}>
+        {formatRupees(slide.total)}
       </Text>
-      <Text style={s.meta}>{whenAndWho(slide.tx)}</Text>
     </View>
   );
 }
 
 type FactsProps = {
   slide: StorySlide;
-  answer: string | undefined;
-  error: boolean;
   onDetails: (query: string) => void;
-  onOpenTransaction: (tx: Transaction) => void;
-  onAnswer: (tx: Transaction, category: string) => void;
   onAdd: () => void;
 };
 
 /** The bottom of the card: a fact and an action. Outside the swipe area so taps reach it. */
-function Facts({ slide, answer, error, onDetails, onOpenTransaction, onAnswer, onAdd }: FactsProps) {
+function Facts({ slide, onDetails, onAdd }: FactsProps) {
   const s = useStyles();
   if (slide.kind === 'empty') {
     return <PrimaryButton label="Add a spend" onPress={onAdd} />;
@@ -129,55 +101,25 @@ function Facts({ slide, answer, error, onDetails, onOpenTransaction, onAnswer, o
     );
   }
 
-  if (slide.kind === 'income') {
-    return (
-      <View style={[s.facts, s.factsIncome]}>
-        <Text style={s.factLine}>Your biggest income is from</Text>
-        <View style={s.incomeRow}>
-          <View style={s.incomeIcon}>
-            <CategoryGlyph category={slide.top.category === 'Salary' ? 'Salary' : 'Income'} size={22} />
-          </View>
-          <View style={s.incomeText}>
-            <Text style={s.incomeSource} numberOfLines={1}>
-              {slide.top.label}
-            </Text>
-            <Text style={s.incomeAmount}>{formatRupees(slide.top.amount)}</Text>
-          </View>
-        </View>
-        <OutlineButton
-          label="View details"
-          onPress={() => onDetails(slide.top.category === 'Personal' ? slide.top.label : slide.top.category)}
-          style={s.fullButton}
-        />
-      </View>
-    );
-  }
-
   return (
-    <View style={s.questionArea}>
-      {answer ? (
-        <View style={[s.choice, s.choiceSelected, s.answered]} accessibilityLiveRegion="polite">
-          <CategoryGlyph category={answer} size={18} />
-          <Text style={s.choiceLabel}>{answer === 'Personal' ? 'Kept as personal. Thanks.' : `Marked as ${answer.toLowerCase()}. Thanks.`}</Text>
+    <View style={[s.facts, s.factsIncome]}>
+      <Text style={s.factLine}>Your biggest income is from</Text>
+      <View style={s.incomeRow}>
+        <View style={s.incomeIcon}>
+          <CategoryGlyph category={slide.top.category === 'Salary' ? 'Salary' : 'Income'} size={22} />
         </View>
-      ) : (
-        <View style={s.choices}>
-          {slide.suggestions.map(category => (
-            <Pressable
-              key={category}
-              accessibilityRole="button"
-              accessibilityLabel={`It was ${category}`}
-              onPress={() => onAnswer(slide.tx, category)}
-              style={({ pressed }) => [s.choice, pressed && s.choiceSelected]}>
-              <CategoryGlyph category={category} size={18} />
-              <Text style={s.choiceLabel}>{category}</Text>
-            </Pressable>
-          ))}
+        <View style={s.incomeText}>
+          <Text style={s.incomeSource} numberOfLines={1}>
+            {slide.top.label}
+          </Text>
+          <Text style={s.incomeAmount}>{formatRupees(slide.top.amount)}</Text>
         </View>
-      )}
-      {error ? <Text style={s.error}>Couldn’t save that. Try again.</Text> : null}
-      {answer ? null : <TextButton label="It was personal" onPress={() => onAnswer(slide.tx, 'Personal')} />}
-      <TextButton label="View transaction details" onPress={() => onOpenTransaction(slide.tx)} />
+      </View>
+      <OutlineButton
+        label="View details"
+        onPress={() => onDetails(slide.top.category === 'Personal' ? slide.top.label : slide.top.category)}
+        style={s.fullButton}
+      />
     </View>
   );
 }
@@ -199,17 +141,14 @@ function StoryBar({ state }: { state: 'seen' | 'unseen' | Animated.Value }) {
 }
 
 /**
- * Full-screen story for the month: top categories, income, then payments to place. Slides
- * auto-advance (a question waits for an answer); tap the left or right of the top half (or
- * swipe) to move, hold to pause, swipe down to close.
+ * Full-screen story for the month: top categories, then income. Slides auto-advance; tap the left
+ * or right of the top half (or swipe) to move, hold to pause, swipe down to close.
  */
 export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
   const s = useStyles();
   const { c } = useTheme();
   const [slides, setSlides] = useState<StorySlide[] | null>(null);
   const [index, setIndex] = useState(route.params.startIndex);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [failed, setFailed] = useState<string | null>(null);
   const progress = useRef(new Animated.Value(0)).current;
   const { width } = useWindowDimensions();
   const closed = useRef(false);
@@ -224,7 +163,6 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
   const count = slides?.length ?? 0;
   const current = Math.min(index, Math.max(count - 1, 0));
   const slide = slides?.[current];
-  const waiting = slide?.kind === 'question' && !answers[slide.tx.id];
 
   const close = useCallback(() => {
     if (!closed.current) {
@@ -238,9 +176,6 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
 
   const resume = useCallback(() => {
     progress.stopAnimation(value => {
-      if (waiting) {
-        return; // a question stays until it's answered or skipped
-      }
       Animated.timing(progress, {
         toValue: 1,
         duration: SLIDE_MS * (1 - value),
@@ -248,7 +183,7 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
         useNativeDriver: false,
       }).start(({ finished }) => finished && actions.current.go(1));
     });
-  }, [progress, waiting]);
+  }, [progress]);
 
   const go = useCallback(
     (delta: number) => {
@@ -317,17 +252,6 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
     [onRelease, progress],
   );
 
-  const answer = async (tx: Transaction, category: string) => {
-    setFailed(null);
-    try {
-      await updateTransaction(tx.id, { category, kind: kindFor(category), categoryConfirmed: true });
-      setAnswers(a => ({ ...a, [tx.id]: category }));
-      setTimeout(() => actions.current.go(1), 900);
-    } catch {
-      setFailed(tx.id);
-    }
-  };
-
   return (
     <Screen>
       <View style={s.bars}>
@@ -366,11 +290,7 @@ export function StoryScreen({ navigation, route }: ScreenProps<'Story'>) {
             <FadeIn key={`card-${current}`} index={1}>
               <Facts
                 slide={slide}
-                answer={slide.kind === 'question' ? answers[slide.tx.id] : undefined}
-                error={slide.kind === 'question' && failed === slide.tx.id}
-                onDetails={query => navigation.navigate('Home', { tab: 'transactions', query })}
-                onOpenTransaction={transaction => navigation.navigate('TransactionDetails', { transaction })}
-                onAnswer={answer}
+                onDetails={query => navigation.navigate('Transactions', { query })}
                 onAdd={() => navigation.replace('AddTransaction')}
               />
             </FadeIn>
@@ -415,7 +335,6 @@ const useStyles = makeStyles((c, isDark) => ({
   bodyGap: { marginTop: space[6] },
   hero: { ...type.amountHero, color: c.ink },
   heroIncome: { color: c.peacock },
-  meta: { ...type.caption, color: c.inkMuted, marginTop: space[1], textAlign: 'center' },
   caption: { ...type.caption, color: c.inkMuted },
 
   cardArea: { padding: space[6], paddingTop: 0, minHeight: 200, justifyContent: 'flex-end' },
@@ -442,24 +361,4 @@ const useStyles = makeStyles((c, isDark) => ({
   incomeText: { flex: 1 },
   incomeSource: { ...type.bodyStrong, color: c.ink },
   incomeAmount: { ...type.amountMedium, color: c.peacock },
-
-  questionArea: { alignItems: 'stretch', gap: space[2] },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
-  choice: {
-    flexGrow: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[2],
-    minHeight: 52,
-    paddingHorizontal: space[4],
-    borderRadius: radius.m,
-    borderWidth: 1,
-    borderColor: c.line,
-    backgroundColor: c.surface,
-  },
-  choiceSelected: { backgroundColor: c.surfaceSunken, borderColor: c.ink },
-  answered: { flexGrow: 0 },
-  choiceLabel: { ...type.label, color: c.ink },
-  error: { ...type.caption, color: c.low, textAlign: 'center' },
 }));

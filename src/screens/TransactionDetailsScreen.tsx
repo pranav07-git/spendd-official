@@ -80,6 +80,8 @@ function EditCard({ tx, onSaved }: { tx: Transaction; onSaved: (tx: Transaction)
         direction,
         category,
         kind: kindFor(category),
+        // A category picked here is the user's answer; Spendd AI never changes it afterwards.
+        ...(category !== tx.category ? { categorySource: 'user' as const, categoryConfirmed: true } : {}),
         needsReview: false,
       });
       if (updated) {

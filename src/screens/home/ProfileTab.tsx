@@ -14,7 +14,7 @@ import { transactionsToCsv } from '../../transactions/csv';
 import { formatDate, formatRupees } from '../../transactions/format';
 import { clearTransactions } from '../../transactions/store';
 import type { Transaction } from '../../transactions/types';
-import { signOut } from '../../auth/session';
+import { getCurrentUser, signOut } from '../../auth/session';
 import {
   makeStyles,
   SCREEN_PADDING,
@@ -221,7 +221,7 @@ export function ProfileTab({
           <Avatar profile={profile} size={80} />
           <View style={s.identityText}>
             <Text style={s.name} accessibilityRole="header" numberOfLines={2}>
-              {profile.name}
+              {profile.name || getCurrentUser()?.email || 'Your profile'}
             </Text>
             <Text style={s.since}>
               {stats.since != null ? `Tracking since ${formatDate(stats.since)}` : 'New to Spendd'}
