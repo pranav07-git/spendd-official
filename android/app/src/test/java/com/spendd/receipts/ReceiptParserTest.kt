@@ -36,7 +36,7 @@ class ReceiptParserTest {
         assertEquals("Rohit Joshi", r.counterparty)
         assertEquals("9837738133@ptyes", r.handle)
         assertEquals(ParsedDate(2026, 7, 13, 15, 38), r.date)
-        assertEquals(Direction.DEBIT, r.direction)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -64,7 +64,7 @@ class ReceiptParserTest {
         assertEquals("656116935626", r.txnRef)
         assertEquals("State Bank of India", r.bank)
         assertEquals("Navi", r.provider)
-        assertEquals(Direction.DEBIT, r.direction)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -90,6 +90,7 @@ class ReceiptParserTest {
         assertEquals("Harshit Saini", r.counterparty)
         assertEquals(ParsedDate(2026, 7, 14, 23, 34), r.date)
         assertEquals("FMPIB6166482490", r.txnRef)
+        assertTrue(r.looksLikePayment)
     }
 
     private val phonePeFirstPass = arrayOf(
@@ -124,6 +125,7 @@ class ReceiptParserTest {
         assertEquals(1.0, r.amount!!, 0.0)
         assertEquals("Rohi JoshT", r.counterparty) // OCR garbled by the annotation box on the sample
         assertEquals("XXXXXX8133", r.handle)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -148,6 +150,7 @@ class ReceiptParserTest {
         assertEquals(ParsedDate(2026, 7, 12, 20, 45), r.date)
         assertEquals("418723901234", r.txnRef)
         assertEquals("HDFC Bank", r.bank)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -157,7 +160,10 @@ class ReceiptParserTest {
         assertEquals("Zomato", relative.counterparty)
         assertEquals(ParsedDate(2026, 10, 4, 13, 5), relative.date)
 
+        assertTrue(relative.looksLikePayment)
+
         val yearless = parseRows("Z 1,250" to 80, "Sent to Ravi Kumar" to 28, "28 Dec, 9:41 AM" to 24)
+        assertTrue(yearless.looksLikePayment)
         assertEquals(1250.0, yearless.amount!!, 0.0)
         assertEquals("Ravi Kumar", yearless.counterparty)
         // December is after "today" (October), so it must be last year's.
@@ -165,18 +171,22 @@ class ReceiptParserTest {
     }
 
     @Test
-    fun moneyReceived() {
+    fun spentScreenMentioningCreditedOrRefundStaysASpend() {
+        // Words like "credited" or "refund" no longer make a payment look received; every
+        // screenshot is money out.
         val r = parseRows(
-            "Received from" to 26,
+            "Paid to" to 26,
             "Priya Sharma" to 34,
-            "+ ₹5,000" to 80,
-            "Credited to Kotak Mahindra Bank" to 24,
+            "₹5,000" to 80,
+            "Amount will be credited to the payee's bank" to 22,
+            "Get 100% refund on cancellations" to 22,
             "3 Aug 2026, 10:12 AM" to 24,
+            "UPI Ref No. 418723901299" to 22,
         )
-        assertEquals(Direction.CREDIT, r.direction)
         assertEquals("Priya Sharma", r.counterparty)
         assertEquals(5000.0, r.amount!!, 0.0)
         assertEquals(ParsedDate(2026, 8, 3, 10, 12), r.date)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -186,6 +196,7 @@ class ReceiptParserTest {
         assertEquals("swiggy@icici", r.counterparty)
         assertEquals(ParsedDate(2026, 7, 9, null, null), r.date)
         assertEquals("512345678901", r.txnRef)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -195,6 +206,7 @@ class ReceiptParserTest {
         assertEquals("Myntra Designs", r.counterparty)
         assertEquals(ParsedDate(2026, 6, 21, 18, 40), r.date)
         assertEquals("617283940516", r.txnRef)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -213,16 +225,17 @@ class ReceiptParserTest {
 
     @Test
     fun rupeeMisreadAsSevenIsResolvedAcrossPasses() {
-        // First pass read "+₹5,000" as "+75,000"; the inverted pass read "+5,000" on the same row.
+        // First pass read "₹5,000" as "75,000"; the inverted pass read "5,000" on the same row.
         val r = parse(
             1600,
-            Triple(300, 36, "Received from"),
+            Triple(300, 36, "Paid to"),
             Triple(380, 48, "Priya Sharma"),
-            Triple(470, 120, "+75,000"),
-            Triple(472, 118, "+5,000"),
+            Triple(470, 120, "75,000"),
+            Triple(472, 118, "5,000"),
             Triple(640, 32, "3 Aug 2026, 10:12 AM"),
         )
         assertEquals(5000.0, r.amount!!, 0.0)
+        assertTrue(r.looksLikePayment)
     }
 
     @Test
@@ -231,6 +244,7 @@ class ReceiptParserTest {
         assertEquals("9876543210@ybl", r.counterparty)
         assertEquals("9876543210@ybl", r.handle)
         assertEquals("rohit@okaxis", parseRows("₹10" to 80, "Paid to rohit @ okaxis" to 30).handle)
+        assertTrue(r.looksLikePayment)
     }
 
     // ---- only payment confirmations are logged -------------------------------------------------
@@ -242,7 +256,9 @@ class ReceiptParserTest {
             parseRows("Z 1,250" to 80, "Sent to Ravi Kumar" to 28, "28 Dec, 9:41 AM" to 24),
             parseRows("Paid ₹1,299 to Myntra Designs" to 30, "on 21 Jun 2026 at 6:40 pm" to 22),
             parseRows("Rs.120.50 debited from A/c XX1234 on 09-07-26 to VPA swiggy@icici. UPI Ref 512345678901" to 24),
-            parseRows("Received from" to 26, "Priya Sharma" to 34, "+ ₹5,000" to 80, "3 Aug 2026, 10:12 AM" to 24),
+            parseRows("Paid to" to 26, "Priya Sharma" to 34, "₹5,000" to 80, "3 Aug 2026, 10:12 AM" to 24),
+            parseRows("Rs. 120.50" to 73, "Sent to 987654321 0@ybl" to 34, "Jul 9, 2026 9:02 AM" to 31),
+            parseRows("₹10" to 80, "Paid to rohit @ okaxis" to 30),
             parseRows("Transaction Successful" to 34, "Amount" to 22, "₹ 2,450.00" to 30, "UPI Ref No." to 22, "418723901234" to 26),
         ).forEach { assertTrue(it.looksLikePayment) }
     }

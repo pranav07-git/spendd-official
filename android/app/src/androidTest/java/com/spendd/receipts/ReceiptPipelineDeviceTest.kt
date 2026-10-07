@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,11 +50,11 @@ class ReceiptPipelineDeviceTest {
         ReceiptParser.parse(lines, height)
     }
 
-    private fun check(name: String, parsed: ParsedReceipt, amount: Double, counterparty: String, direction: Direction = Direction.DEBIT) {
+    private fun check(name: String, parsed: ParsedReceipt, amount: Double, counterparty: String) {
         val ocr = lastLines.joinToString(" | ") { "${it.top}:h${it.height} ${it.text}" }
         assertEquals("$name amount ($parsed) OCR: $ocr", amount, parsed.amount ?: -1.0, 0.001)
         assertEquals("$name counterparty ($parsed) OCR: $ocr", counterparty.lowercase(), parsed.counterparty?.lowercase())
-        assertEquals("$name direction", direction, parsed.direction)
+        assertTrue("$name is logged as a payment", parsed.looksLikePayment)
     }
 
     @Test
@@ -82,15 +83,15 @@ class ReceiptPipelineDeviceTest {
             2450.0, "Swiggy Limited",
         )
         check(
-            "green credit",
+            "green, paid to a person",
             parse(
                 render(
                     Color.rgb(27, 94, 32), Color.WHITE,
-                    Row("Received from", 36f), Row("Priya Sharma", 48f, true), Row("+₹5,000", 130f, true),
-                    Row("Credited to Kotak Mahindra Bank", 32f), Row("3 Aug 2026, 10:12 AM", 32f),
+                    Row("Paid to", 36f), Row("Priya Sharma", 48f, true), Row("₹5,000", 130f, true),
+                    Row("Debited from Kotak Mahindra Bank", 32f), Row("3 Aug 2026, 10:12 AM", 32f),
                 ),
             ),
-            5000.0, "Priya Sharma", Direction.CREDIT,
+            5000.0, "Priya Sharma",
         )
         val relative = parse(
             render(

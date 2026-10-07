@@ -89,7 +89,7 @@ class ReceiptWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                     put("id", UUID.randomUUID().toString())
                     put("amount", amount ?: JSONObject.NULL)
                     put("currency", "INR")
-                    put("direction", if (parsed.direction == Direction.CREDIT) "credit" else "debit")
+                    put("direction", "debit")
                     put("counterparty", parsed.counterparty ?: JSONObject.NULL)
                     put("handle", parsed.handle ?: JSONObject.NULL)
                     put("txnRef", parsed.txnRef ?: JSONObject.NULL)
@@ -126,8 +126,8 @@ class ReceiptWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     }
 
     private fun describe(parsed: ParsedReceipt): String {
-        val who = parsed.counterparty ?: return if (parsed.direction == Direction.CREDIT) "received" else "paid"
-        return if (parsed.direction == Direction.CREDIT) "from $who" else "to $who"
+        val who = parsed.counterparty ?: return "paid"
+        return "to $who"
     }
 
     private fun formatRupees(amount: Double): String =
