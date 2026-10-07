@@ -2,7 +2,7 @@
 
 Features and screens: [docs/FEATURES.md](docs/FEATURES.md) · Design system: [docs/DESIGN.md](docs/DESIGN.md)
 
-Agentic finance app. React Native CLI (0.87, New Architecture), Android only for now.
+towards "Agentic" finance app. React Native CLI (0.87, New Architecture), Android only for now.
 
 ## Screens & flow
 
