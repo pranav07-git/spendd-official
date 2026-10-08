@@ -77,5 +77,13 @@ yarn-error.log
 # Real payment screenshots used as OCR fixtures contain personal UPI details
 android/app/src/androidTest/assets/receipts/
 
-# App secrets (server token)
+# Secrets: never commit keys, service configs or env files
 src/secrets.ts
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.p12
+*.pem
