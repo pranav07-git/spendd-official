@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -21,10 +21,15 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   const handleLogin = async () => {
+    // The keyboard's Done key calls this too, and only the button is disabled while busy.
+    if (busy) {
+      return;
+    }
     if (!email.trim() || !password) {
-      setError('Please enter your email and password.');
+      setError('Add your email and password to sign in.');
       return;
     }
     setError(null);
@@ -54,7 +59,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
 
           <View style={s.form}>
             <View style={s.field}>
-              <Text style={s.label}>EMAIL</Text>
+              <Text style={s.label}>Email</Text>
               <TextInput
                 style={s.input}
                 value={email}
@@ -70,12 +75,14 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
                 autoComplete="email"
                 textContentType="emailAddress"
                 returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
             </View>
 
             <View style={s.field}>
-              <Text style={s.label}>PASSWORD</Text>
+              <Text style={s.label}>Password</Text>
               <TextInput
+                ref={passwordRef}
                 style={s.input}
                 value={password}
                 onChangeText={v => {
@@ -104,7 +111,7 @@ export function LoginScreen({ navigation }: ScreenProps<'Login'>) {
             <TextButton
               label="Sign up"
               color={c.ink}
-              onPress={() => navigation.navigate('SignUp')}
+              onPress={() => navigation.replace('SignUp')}
             />
           </View>
         </ScrollView>
@@ -131,7 +138,7 @@ const useStyles = makeStyles(c => ({
   },
   form: { gap: space[5] },
   field: { gap: space[2] },
-  label: { ...type.caption, letterSpacing: 1.5, color: c.inkMuted },
+  label: { ...type.caption, color: c.inkMuted },
   input: {
     ...type.body,
     color: c.ink,

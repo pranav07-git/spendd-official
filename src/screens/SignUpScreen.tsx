@@ -29,8 +29,12 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
   const confirmRef = useRef<any>(null);
 
   const handleSignUp = async () => {
+    // The keyboard's Done key calls this too, and only the button is disabled while busy.
+    if (busy) {
+      return;
+    }
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-      setError('Please fill in all fields.');
+      setError('Fill in every field to create your account.');
       return;
     }
     if (password.length < MIN_PASSWORD) {
@@ -38,7 +42,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords don't match. Please try again.");
+      setError('Those passwords don’t match.');
       return;
     }
     setError(null);
@@ -68,7 +72,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
 
           <View style={s.form}>
             <View style={s.field}>
-              <Text style={s.label}>NAME</Text>
+              <Text style={s.label}>Name</Text>
               <TextInput
                 style={s.input}
                 value={name}
@@ -89,7 +93,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
             </View>
 
             <View style={s.field}>
-              <Text style={s.label}>EMAIL</Text>
+              <Text style={s.label}>Email</Text>
               <TextInput
                 ref={emailRef}
                 style={s.input}
@@ -111,7 +115,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
             </View>
 
             <View style={s.field}>
-              <Text style={s.label}>PASSWORD</Text>
+              <Text style={s.label}>Password</Text>
               <TextInput
                 ref={passwordRef}
                 style={s.input}
@@ -133,7 +137,7 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
             </View>
 
             <View style={s.field}>
-              <Text style={s.label}>CONFIRM PASSWORD</Text>
+              <Text style={s.label}>Confirm password</Text>
               <TextInput
                 ref={confirmRef}
                 style={s.input}
@@ -163,12 +167,20 @@ export function SignUpScreen({ navigation }: ScreenProps<'SignUp'>) {
             <TextButton
               label="Sign in"
               color={c.ink}
-              onPress={() => navigation.navigate('Login')}
+              onPress={() => navigation.replace('Login')}
             />
           </View>
 
           <Text style={s.legal}>
-            By creating an account you agree to our Terms of Service and Privacy Policy.
+            By creating an account you agree to our{' '}
+            <Text style={s.legalLink} onPress={() => navigation.navigate('Legal', { doc: 'terms' })}>
+              Terms of Use
+            </Text>{' '}
+            and{' '}
+            <Text style={s.legalLink} onPress={() => navigation.navigate('Legal', { doc: 'privacy' })}>
+              Privacy Policy
+            </Text>
+            .
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -194,7 +206,7 @@ const useStyles = makeStyles(c => ({
   },
   form: { gap: space[5] },
   field: { gap: space[2] },
-  label: { ...type.caption, letterSpacing: 1.5, color: c.inkMuted },
+  label: { ...type.caption, color: c.inkMuted },
   input: {
     ...type.body,
     color: c.ink,
@@ -217,4 +229,5 @@ const useStyles = makeStyles(c => ({
     marginTop: space[5],
     paddingHorizontal: space[4],
   },
+  legalLink: { color: c.info },
 }));

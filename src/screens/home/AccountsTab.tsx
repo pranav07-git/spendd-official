@@ -1,5 +1,6 @@
 import { ScrollView, Text, View } from 'react-native';
 import { PrimaryButton, TextButton } from '../../components/Buttons';
+import { Header } from '../../components/Header';
 import { Card, StoryHeader } from '../../components/Layout';
 import { budgetStatus, periodFor, type Budget } from '../../transactions/budget';
 import { formatDayMonth, formatRupees } from '../../transactions/format';
@@ -52,89 +53,88 @@ export function AccountsTab({ transactions, budget, onOpen, onSetBudget }: Props
   }
 
   return (
-    <ScrollView contentContainerStyle={s.feed} showsVerticalScrollIndicator={false}>
-      <FadeIn index={0}>
-        <Text style={s.title} accessibilityRole="header">
-          Budget
-        </Text>
-        <StoryHeader story={statusLine} caption={periodFor(budget ?? THIS_MONTH).label} style={s.story} />
-      </FadeIn>
+    <View style={s.root}>
+      <Header title="Budget" />
+      <ScrollView contentContainerStyle={s.feed} showsVerticalScrollIndicator={false}>
+        <FadeIn index={0}>
+          <StoryHeader story={statusLine} caption={periodFor(budget ?? THIS_MONTH).label} />
+        </FadeIn>
 
-      <FadeIn index={1}>
-        {budget ? (
-          <Card style={s.firstCard}>
-            <View style={s.labelRow}>
-              <Text style={s.cardLabel}>{PERIOD_LABEL[budget.period]}</Text>
-              <TextButton label="Edit" onPress={onSetBudget} style={s.edit} />
-            </View>
+        <FadeIn index={1}>
+          {budget ? (
+            <Card style={s.firstCard}>
+              <View style={s.labelRow}>
+                <Text style={s.cardLabel}>{PERIOD_LABEL[budget.period]}</Text>
+                <TextButton label="Edit" onPress={onSetBudget} style={s.edit} />
+              </View>
 
-            <View
-              style={s.amountRow}
-              accessible
-              accessibilityLabel={`${formatRupees(status.spent)} spent of ${formatRupees(budget.amount)}`}>
-              <Text style={s.heroAmount}>{formatRupees(status.spent)}</Text>
-              <Text style={s.heroCaption}>spent of {formatRupees(budget.amount)}</Text>
-            </View>
+              <View
+                style={s.amountRow}
+                accessible
+                accessibilityLabel={`${formatRupees(status.spent)} spent of ${formatRupees(budget.amount)}`}>
+                <Text style={s.heroAmount}>{formatRupees(status.spent)}</Text>
+                <Text style={s.heroCaption}>spent of {formatRupees(budget.amount)}</Text>
+              </View>
 
-            <View
-              style={s.track}
-              accessibilityRole="progressbar"
-              accessibilityLabel={`${usedPct}% of budget used`}
-              accessibilityValue={{ min: 0, max: 100, now: Math.min(usedPct, 100) }}>
-              <View style={[s.trackFill, { backgroundColor: fillColor, width: `${Math.min(usedPct, 100)}%` }]} />
-            </View>
-            <View style={s.metaRow}>
-              <Text style={[s.meta, over && s.metaOver]}>
-                {over ? `${formatRupees(-status.remaining)} over` : `${formatRupees(status.remaining)} left`}
+              <View
+                style={s.track}
+                accessibilityRole="progressbar"
+                accessibilityLabel={`${usedPct}% of budget used`}
+                accessibilityValue={{ min: 0, max: 100, now: Math.min(usedPct, 100) }}>
+                <View style={[s.trackFill, { backgroundColor: fillColor, width: `${Math.min(usedPct, 100)}%` }]} />
+              </View>
+              <View style={s.metaRow}>
+                <Text style={[s.meta, over && s.metaOver]}>
+                  {over ? `${formatRupees(-status.remaining)} over` : `${formatRupees(status.remaining)} left`}
+                </Text>
+                <Text style={s.meta}>
+                  {status.state === 'ended'
+                    ? 'Ended'
+                    : `${status.daysLeft} ${status.daysLeft === 1 ? 'day' : 'days'} ${status.state === 'upcoming' ? 'long' : 'to go'}`}
+                </Text>
+              </View>
+            </Card>
+          ) : (
+            <Card style={s.firstCard}>
+              <Text style={s.cardLabel}>This month</Text>
+              <View style={s.amountRow}>
+                <Text style={s.heroAmount}>{formatRupees(status.spent)}</Text>
+                <Text style={s.heroCaption}>spent so far</Text>
+              </View>
+              <Text style={s.statusLine}>
+                Set a budget for the month, or for a stretch of days like a trip, and Spendd keeps count from your
+                spends.
               </Text>
-              <Text style={s.meta}>
-                {status.state === 'ended'
-                  ? 'Ended'
-                  : `${status.daysLeft} ${status.daysLeft === 1 ? 'day' : 'days'} ${status.state === 'upcoming' ? 'long' : 'to go'}`}
-              </Text>
-            </View>
-          </Card>
-        ) : (
-          <Card style={s.firstCard}>
-            <Text style={s.cardLabel}>This month</Text>
-            <View style={s.amountRow}>
-              <Text style={s.heroAmount}>{formatRupees(status.spent)}</Text>
-              <Text style={s.heroCaption}>spent so far</Text>
-            </View>
-            <Text style={s.statusLine}>
-              Set a budget for the month, or for a stretch of days like a trip, and Spendd keeps count from your
-              spends.
-            </Text>
-            <PrimaryButton label="Set a budget" onPress={onSetBudget} style={s.cta} />
-          </Card>
-        )}
-      </FadeIn>
+              <PrimaryButton label="Set a budget" onPress={onSetBudget} style={s.cta} />
+            </Card>
+          )}
+        </FadeIn>
 
-      <FadeIn index={2}>
-        <SectionTitle title="Where it went" />
-        {status.spending.categories.length > 0 ? (
-          <>
-            <Text style={s.sectionCaption}>
-              {paymentCount(status.spending.count)} · {status.period.label}
+        <FadeIn index={2}>
+          <SectionTitle title="Where it went" />
+          {status.spending.categories.length > 0 ? (
+            <>
+              <Text style={s.sectionCaption}>
+                {paymentCount(status.spending.count)} · {status.period.label}
+              </Text>
+              <CategoryBreakdown categories={status.spending.categories} showDates onOpen={onOpen} />
+            </>
+          ) : (
+            <Text style={s.empty}>
+              {status.state === 'upcoming'
+                ? 'This budget hasn’t started yet.'
+                : 'No spends in this period yet. Share your next UPI screenshot to start.'}
             </Text>
-            <CategoryBreakdown categories={status.spending.categories} showDates onOpen={onOpen} />
-          </>
-        ) : (
-          <Text style={s.empty}>
-            {status.state === 'upcoming'
-              ? 'This budget hasn’t started yet.'
-              : 'No spends in this period yet. Share your next UPI screenshot to start.'}
-          </Text>
-        )}
-      </FadeIn>
-    </ScrollView>
+          )}
+        </FadeIn>
+      </ScrollView>
+    </View>
   );
 }
 
 const useStyles = makeStyles(c => ({
-  feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[2], paddingBottom: TAB_BAR_CLEARANCE },
-  title: { ...type.heading, color: c.inkMuted },
-  story: { marginTop: space[1] },
+  root: { flex: 1, backgroundColor: c.bg },
+  feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: TAB_BAR_CLEARANCE },
   firstCard: { marginTop: space[6] },
 
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -space[3] },

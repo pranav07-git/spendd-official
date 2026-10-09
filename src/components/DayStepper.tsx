@@ -35,7 +35,7 @@ export function DayStepper({ value, onChange, min, max, accessibilityLabel }: Pr
         accessibilityRole="button"
         accessibilityLabel={`${accessibilityLabel}: previous day`}
         disabled={atMin}
-        hitSlop={10}
+        hitSlop={13}
         onPress={() => onChange(addDays(value, -1))}>
         <ChevronLeftIcon size={18} color={atMin ? c.inkSubtle : c.ink} strokeWidth={2} />
       </Pressable>
@@ -46,7 +46,7 @@ export function DayStepper({ value, onChange, min, max, accessibilityLabel }: Pr
         accessibilityRole="button"
         accessibilityLabel={`${accessibilityLabel}: next day`}
         disabled={atMax}
-        hitSlop={10}
+        hitSlop={13}
         onPress={() => onChange(addDays(value, 1))}>
         <ChevronForwardIcon size={18} color={atMax ? c.inkSubtle : c.ink} strokeWidth={2} />
       </Pressable>

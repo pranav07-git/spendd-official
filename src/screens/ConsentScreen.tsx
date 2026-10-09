@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { PrimaryButton } from '../components/Buttons';
+import { Header } from '../components/Header';
 import {
   BotIcon,
   ChartIcon,
@@ -80,9 +81,7 @@ export function ConsentScreen({ navigation }: ScreenProps<'Consent'>) {
 
   return (
     <Screen>
-      <View style={s.topBar}>
-        <Text style={s.brand}>Spendd</Text>
-      </View>
+      <Header title="Spendd" />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <StoryHeader story="Your data stays yours." />
@@ -185,8 +184,6 @@ export function ConsentScreen({ navigation }: ScreenProps<'Consent'>) {
 }
 
 const useStyles = makeStyles(c => ({
-  topBar: { height: 56, justifyContent: 'center', paddingHorizontal: SCREEN_PADDING },
-  brand: { ...type.title, color: c.ink },
   content: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: space[6] },
   body: { ...type.body, color: c.inkMuted, marginTop: space[3] },
   badge: { marginTop: space[4] },

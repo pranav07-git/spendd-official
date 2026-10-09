@@ -11,6 +11,7 @@ import {
   SearchIcon,
 } from '../../components/Icons';
 import { Spotlight } from '../../components/Spotlight';
+import { Header, HeaderButton } from '../../components/Header';
 import { Card, SectionHeading, StoryHeader } from '../../components/Layout';
 import { buildMyMoney, comparisonLine, DISCRETIONARY, MICRO_LIMIT, type CategoryChange, type MyMoney } from '../../insights/myMoney';
 import { monthStart } from '../../insights/stats';
@@ -128,18 +129,14 @@ export function MyMoneyTab({ transactions, stories, onOpen, onOpenStory, onSearc
 
   return (
     <View style={s.root}>
-      <View style={s.header}>
-        <Text style={s.title} accessibilityRole="header">
-          My money
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Search transactions"
-          onPress={onSearch}
-          style={({ pressed }) => [s.iconButton, pressed && s.pressed]}>
-          <SearchIcon size={24} color={c.ink} strokeWidth={1.8} />
-        </Pressable>
-      </View>
+      <Header
+        title="My money"
+        right={
+          <HeaderButton label="Search transactions" onPress={onSearch}>
+            <SearchIcon size={24} color={c.ink} strokeWidth={1.8} />
+          </HeaderButton>
+        }
+      />
 
       <ScrollView contentContainerStyle={s.feed} showsVerticalScrollIndicator={false}>
         <FadeIn index={0}>
@@ -374,17 +371,6 @@ const useStyles = makeStyles(c => ({
   pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
   rowPressed: { backgroundColor: c.surfaceSunken },
   disabled: { opacity: 0.3 },
-  header: {
-    minHeight: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingLeft: SCREEN_PADDING,
-    paddingRight: SCREEN_PADDING - space[3],
-    borderBottomWidth: 1,
-    borderBottomColor: c.line,
-  },
-  title: { ...type.title, color: c.ink },
   iconButton: { width: TOUCH_TARGET, height: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' },
   feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: TAB_BAR_CLEARANCE },
   caption: { ...type.caption, color: c.inkMuted },

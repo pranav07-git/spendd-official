@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Switch, Text, V
 import { useFocusEffect } from '@react-navigation/native';
 import { Avatar } from '../../components/Avatar';
 import { TextButton } from '../../components/Buttons';
+import { Header } from '../../components/Header';
 import { ChevronForwardIcon } from '../../components/Icons';
 import { Card, PrivacyBadge, SectionHeading } from '../../components/Layout';
 import { lifetimeStats } from '../../insights/engine';
@@ -189,9 +190,13 @@ export function ProfileTab({
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            await clearTransactions();
-            await onReload();
-            onToast('Transactions cleared');
+            try {
+              await clearTransactions();
+              await onReload();
+              onToast('Transactions cleared');
+            } catch {
+              onToast('Couldn’t clear your transactions. Try again.');
+            }
           },
         },
       ],
@@ -207,125 +212,133 @@ export function ProfileTab({
           text: 'Reset',
           style: 'destructive',
           onPress: async () => {
-            await wipeAllData();
-            onReset();
+            try {
+              await wipeAllData();
+              onReset();
+            } catch {
+              onToast('Couldn’t reset Spendd. Try again.');
+            }
           },
         },
       ],
     );
 
   return (
-    <ScrollView contentContainerStyle={s.feed} showsVerticalScrollIndicator={false}>
-      <FadeIn index={0}>
-        <View style={s.identity}>
-          <Avatar profile={profile} size={80} />
-          <View style={s.identityText}>
-            <Text style={s.name} accessibilityRole="header" numberOfLines={2}>
-              {profile.name || getCurrentUser()?.email || 'Your profile'}
-            </Text>
-            <Text style={s.since}>
-              {stats.since != null ? `Tracking since ${formatDate(stats.since)}` : 'New to Spendd'}
-            </Text>
+    <View style={s.root}>
+      <Header title="Profile" />
+      <ScrollView contentContainerStyle={s.feed} showsVerticalScrollIndicator={false}>
+        <FadeIn index={0}>
+          <View style={s.identity}>
+            <Avatar profile={profile} size={80} />
+            <View style={s.identityText}>
+              <Text style={s.name} accessibilityRole="header" numberOfLines={2}>
+                {profile.name || getCurrentUser()?.email || 'Your profile'}
+              </Text>
+              <Text style={s.since}>
+                {stats.since != null ? `Tracking since ${formatDate(stats.since)}` : 'New to Spendd'}
+              </Text>
+            </View>
           </View>
-        </View>
-        <TextButton label="Edit profile" onPress={onEditProfile} style={s.editProfile} />
-      </FadeIn>
+          <TextButton label="Edit profile" onPress={onEditProfile} style={s.editProfile} />
+        </FadeIn>
 
-      <FadeIn index={1}>
-        <Card padded={false} style={s.statsCard}>
-          <View style={s.statRow}>
-            <Stat label="Spent this month" value={formatRupees(Math.round(stats.thisMonth))} />
-            <Stat label="Spent all time" value={formatRupees(Math.round(stats.totalSpent))} />
-          </View>
-          <View style={[s.statRow, s.rowDivider]}>
-            <Stat label="Payments logged" value={String(stats.transactions)} />
-            <Stat
-              label="Top category"
-              value={stats.topCategory ?? '—'}
+        <FadeIn index={1}>
+          <Card padded={false} style={s.statsCard}>
+            <View style={s.statRow}>
+              <Stat label="Spent this month" value={formatRupees(Math.round(stats.thisMonth))} />
+              <Stat label="Spent all time" value={formatRupees(Math.round(stats.totalSpent))} />
+            </View>
+            <View style={[s.statRow, s.rowDivider]}>
+              <Stat label="Payments logged" value={String(stats.transactions)} />
+              <Stat
+                label="Top category"
+                value={stats.topCategory ?? '—'}
+              />
+            </View>
+            <View style={[s.statRow, s.rowDivider]}>
+              <Stat label="Days tracked" value={String(stats.daysTracked)} />
+              <Stat label="Budget used" value={status ? `${Math.round(status.usedFraction * 100)}%` : '—'} />
+            </View>
+          </Card>
+        </FadeIn>
+
+        <FadeIn index={2}>
+          <SectionHeading title="Budget" />
+          <Card padded={false}>
+            <Row
+              first
+              label={budget ? `${PERIOD_NAME[budget.period]} budget` : 'No budget set'}
+              value={
+                budget && status
+                  ? `${formatRupees(budget.amount)} • ${status.period.label}`
+                  : 'Set one to get a daily limit and heads-ups'
+              }
+              onPress={onSetBudget}
             />
-          </View>
-          <View style={[s.statRow, s.rowDivider]}>
-            <Stat label="Days tracked" value={String(stats.daysTracked)} />
-            <Stat label="Budget used" value={status ? `${Math.round(status.usedFraction * 100)}%` : '—'} />
-          </View>
-        </Card>
-      </FadeIn>
+          </Card>
 
-      <FadeIn index={2}>
-        <SectionHeading title="Budget" />
-        <Card padded={false}>
-          <Row
-            first
-            label={budget ? `${PERIOD_NAME[budget.period]} budget` : 'No budget set'}
-            value={
-              budget && status
-                ? `${formatRupees(budget.amount)} • ${status.period.label}`
-                : 'Set one to get a daily limit and heads-ups'
-            }
-            onPress={onSetBudget}
-          />
-        </Card>
+          <SectionHeading title="Spendd data processing" />
+          <Card padded={false}>
+            <AiSection />
+          </Card>
 
-        <SectionHeading title="Spendd data processing" />
-        <Card padded={false}>
-          <AiSection />
-        </Card>
+          <SectionHeading title="Security" />
+          <Card padded={false}>
+            <Row first label="Change PIN" onPress={onChangePin} />
+            <Row
+              label="Biometric unlock"
+              value={biometricsAvailable ? 'Fingerprint or face to unlock' : 'Not set up on this phone'}
+              right={
+                togglingBiometrics ? (
+                  <ActivityIndicator color={c.ink} />
+                ) : (
+                  <Switch
+                    value={biometricsOn}
+                    disabled={!biometricsAvailable && !biometricsOn}
+                    onValueChange={toggleBiometrics}
+                    {...switchColors(c, isDark)}
+                    accessibilityLabel="Biometric unlock"
+                  />
+                )
+              }
+            />
+            <Row label="Lock app now" onPress={onLock} />
+            <Row
+              label="Sign out"
+              danger
+              onPress={() =>
+                Alert.alert(
+                  'Sign out?',
+                  "You'll need to sign in again to access Spendd. Your local data stays on this phone.",
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Sign out',
+                      style: 'destructive',
+                      onPress: () => signOut().catch(() => onToast('Couldn’t sign out. Try again.')),
+                    },
+                  ],
+                )
+              }
+            />
+          </Card>
 
-        <SectionHeading title="Security" />
-        <Card padded={false}>
-          <Row first label="Change PIN" onPress={onChangePin} />
-          <Row
-            label="Biometric unlock"
-            value={biometricsAvailable ? 'Fingerprint or face to unlock' : 'Not set up on this phone'}
-            right={
-              togglingBiometrics ? (
-                <ActivityIndicator color={c.ink} />
-              ) : (
-                <Switch
-                  value={biometricsOn}
-                  disabled={!biometricsAvailable && !biometricsOn}
-                  onValueChange={toggleBiometrics}
-                  {...switchColors(c, isDark)}
-                  accessibilityLabel="Biometric unlock"
-                />
-              )
-            }
-          />
-          <Row label="Lock app now" onPress={onLock} />
-          <Row
-            label="Sign out"
-            danger
-            onPress={() =>
-              Alert.alert(
-                'Sign out?',
-                "You'll need to sign in again to access Spendd. Your local data stays on this phone.",
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Sign out',
-                    style: 'destructive',
-                    onPress: () => signOut().catch(() => {}),
-                  },
-                ],
-              )
-            }
-          />
-        </Card>
+          <SectionHeading title="Your data" />
+          <Card padded={false}>
+            <Row label="Export transactions" value="As a CSV for Excel or Sheets" onPress={exportCsv} />
+            <Row label="Clear all transactions" danger onPress={confirmClear} />
+            <Row label="Reset Spendd" value="Erase everything on this phone" danger onPress={confirmReset} />
+          </Card>
 
-        <SectionHeading title="Your data" />
-        <Card padded={false}>
-          <Row label="Export transactions" value="As a CSV for Excel or Sheets" onPress={exportCsv} />
-          <Row label="Clear all transactions" danger onPress={confirmClear} />
-          <Row label="Reset Spendd" value="Erase everything on this phone" danger onPress={confirmReset} />
-        </Card>
-
-        <PrivacyBadge text="Your transactions stay on this phone." style={s.footer} />
-      </FadeIn>
-    </ScrollView>
+          <PrivacyBadge text="Your transactions stay on this phone." style={s.footer} />
+        </FadeIn>
+      </ScrollView>
+    </View>
   );
 }
 
 const useStyles = makeStyles(c => ({
+  root: { flex: 1, backgroundColor: c.bg },
   feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[6], paddingBottom: TAB_BAR_CLEARANCE },
   identity: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
   identityText: { flex: 1 },

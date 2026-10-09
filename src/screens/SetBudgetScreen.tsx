@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
 import { PrimaryButton, TextButton } from '../components/Buttons';
 import { Chips } from '../components/Chips';
@@ -29,21 +29,27 @@ export function SetBudgetScreen({ navigation }: ScreenProps<'SetBudget'>) {
   const [end, setEnd] = useState(addDays(today, 6));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const amountRef = useRef<ComponentRef<typeof TextInput>>(null);
 
+  // The saved budget loads after the first render, so the keyboard only opens once we know
+  // there isn't one (editing an existing budget usually means changing the period, not typing).
   useEffect(() => {
-    getBudget().then(budget => {
-      if (!budget) {
-        return;
-      }
-      setExisting(budget);
-      setAmount(String(budget.amount));
-      setPeriod(budget.period);
-      if (budget.period === 'custom') {
-        const p = periodFor(budget);
-        setStart(p.start);
-        setEnd(addDays(p.end, -1));
-      }
-    });
+    getBudget()
+      .catch(() => null)
+      .then(budget => {
+        if (!budget) {
+          amountRef.current?.focus();
+          return;
+        }
+        setExisting(budget);
+        setAmount(String(budget.amount));
+        setPeriod(budget.period);
+        if (budget.period === 'custom') {
+          const p = periodFor(budget);
+          setStart(p.start);
+          setEnd(addDays(p.end, -1));
+        }
+      });
   }, []);
 
   const changeStart = (day: number) => {
@@ -81,8 +87,12 @@ export function SetBudgetScreen({ navigation }: ScreenProps<'SetBudget'>) {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
-          await removeBudget();
-          navigation.goBack();
+          try {
+            await removeBudget();
+            navigation.goBack();
+          } catch {
+            Alert.alert('Couldn’t remove the budget', 'Something went wrong on this phone. Try again.');
+          }
         },
       },
     ]);
@@ -106,7 +116,7 @@ export function SetBudgetScreen({ navigation }: ScreenProps<'SetBudget'>) {
             placeholder="0"
             placeholderTextColor={c.inkSubtle}
             style={[s.amountText, s.amountInput]}
-            autoFocus={!existing}
+            ref={amountRef}
             accessibilityLabel="Budget amount"
           />
         </View>

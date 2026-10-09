@@ -35,6 +35,19 @@ export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   };
 
+  const skip = async () => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await finish();
+    } catch {
+      setMessage('Couldn’t finish setting up. Try again.');
+      setBusy(false);
+    }
+  };
+
   const enable = async () => {
     setMessage(null);
     if (!(await getBiometryType())) {
@@ -54,7 +67,7 @@ export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
 
   return (
     <Screen>
-      <Header title="Fingerprint unlock" onBack={navigation.goBack} />
+      <Header title="Fingerprint unlock" />
 
       <View style={s.body}>
         <StoryHeader
@@ -74,7 +87,7 @@ export function BiometricScreen({ navigation }: ScreenProps<'Biometric'>) {
 
       <View style={s.actions}>
         <PrimaryButton label="Turn on fingerprint unlock" onPress={enable} loading={busy} />
-        <TextButton label="Maybe later" onPress={finish} style={s.later} />
+        <TextButton label="Maybe later" onPress={skip} style={s.later} />
       </View>
     </Screen>
   );

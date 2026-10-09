@@ -3,13 +3,11 @@ import {
   BackHandler,
   PermissionsAndroid,
   Platform,
-  Pressable,
   ScrollView,
-  Text,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { BellIcon } from '../../components/Icons';
+import { Header } from '../../components/Header';
 import { StoryHeader } from '../../components/Layout';
 import { Screen } from '../../components/Screen';
 import { useToast } from '../../components/Toast';
@@ -21,7 +19,7 @@ import { firstName } from '../../storage/appState';
 import { formatRupees } from '../../transactions/format';
 import { monthlyStory } from '../../transactions/stories';
 import type { Transaction } from '../../transactions/types';
-import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../../theme';
+import { makeStyles, SCREEN_PADDING, space } from '../../theme';
 import { AccountsTab } from './AccountsTab';
 import {
   AiNote,
@@ -80,50 +78,52 @@ function HomeFeed({
   const top = (ai.insights ?? report.insights).slice(0, HOME_INSIGHTS);
   const first = firstName(name);
   return (
-    <ScrollView
-      contentContainerStyle={s.feed}
-      showsVerticalScrollIndicator={false}
-    >
-      <FadeIn index={0}>
-        <Text style={s.greeting}>{first ? `Hi ${first}` : 'Hi there'}</Text>
-        <StoryHeader story={report.headline} style={s.story} />
-      </FadeIn>
+    <View style={s.root}>
+      <Header title={first ? `Hi ${first}` : 'Home'} />
+      <ScrollView
+        contentContainerStyle={s.feed}
+        showsVerticalScrollIndicator={false}
+      >
+        <FadeIn index={0}>
+          <StoryHeader story={report.headline} />
+        </FadeIn>
 
-      <FadeIn index={1}>
-        <View style={s.firstCard}>
-          <DailyStatusCard status={report.dailyStatus} />
-        </View>
-      </FadeIn>
-
-      <FadeIn index={2}>
-        <SectionTitle title="This month’s story" />
-        <StoryStrip items={storiesFor(transactions)} onPress={onOpenStory} />
-      </FadeIn>
-
-      <FadeIn index={3}>
-        <SectionTitle
-          title="Insights"
-          action={{ label: 'See all', onPress: onSeeAllInsights }}
-        />
-        <InsightsCard items={top} />
-        <AiNote thinking={ai.thinking} written={ai.insights != null} />
-      </FadeIn>
-
-      {report.dailyBudget ? (
-        <FadeIn index={4}>
-          <View style={s.budget}>
-            <DailyBudgetCard budget={report.dailyBudget} />
+        <FadeIn index={1}>
+          <View style={s.firstCard}>
+            <DailyStatusCard status={report.dailyStatus} />
           </View>
         </FadeIn>
-      ) : null}
 
-      {report.habits.length > 0 ? (
-        <FadeIn index={5}>
-          <SectionTitle title="Spending habits" />
-          <HabitChips habits={report.habits} />
+        <FadeIn index={2}>
+          <SectionTitle title="This month’s story" />
+          <StoryStrip items={storiesFor(transactions)} onPress={onOpenStory} />
         </FadeIn>
-      ) : null}
-    </ScrollView>
+
+        <FadeIn index={3}>
+          <SectionTitle
+            title="Insights"
+            action={{ label: 'See all', onPress: onSeeAllInsights }}
+          />
+          <InsightsCard items={top} />
+          <AiNote thinking={ai.thinking} written={ai.insights != null} />
+        </FadeIn>
+
+        {report.dailyBudget ? (
+          <FadeIn index={4}>
+            <View style={s.budget}>
+              <DailyBudgetCard budget={report.dailyBudget} />
+            </View>
+          </FadeIn>
+        ) : null}
+
+        {report.habits.length > 0 ? (
+          <FadeIn index={5}>
+            <SectionTitle title="Spending habits" />
+            <HabitChips habits={report.habits} />
+          </FadeIn>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -132,7 +132,6 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
   const { transactions, budget, profile, reload } = useMoneyData();
   const toast = useToast(TAB_BAR_CLEARANCE - space[4]);
   const s = useStyles();
-  const { c } = useTheme();
 
   // The on-device insights model: pure and fast, so it reruns on every change.
   const report = useMemo(
@@ -178,19 +177,6 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
   return (
     <Screen>
-      {tab !== 'home' ? null : (
-        <View style={s.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            onPress={() => toast.show('You’re all caught up')}
-            style={({ pressed }) => [s.iconButton, s.bell, pressed && s.pressed]}
-          >
-            <BellIcon size={24} color={c.ink} strokeWidth={1.8} />
-          </Pressable>
-        </View>
-      )}
-
       <View style={s.body}>
         {!transactions || !report ? null : tab === 'home' ? (
           <HomeFeed
@@ -257,22 +243,10 @@ export function HomeScreen({ navigation }: ScreenProps<'Home'>) {
   );
 }
 
-const useStyles = makeStyles(c => ({
-  pressed: { transform: [{ scale: 0.97 }], opacity: 0.85 },
-  topBar: {
-    height: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: SCREEN_PADDING,
-    backgroundColor: c.bg,
-  },
-  iconButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  bell: { borderRadius: radius.pill, marginRight: -space[2] },
+const useStyles = makeStyles(() => ({
   body: { flex: 1 },
-  feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[2], paddingBottom: TAB_BAR_CLEARANCE },
-  greeting: { ...type.heading, color: c.inkMuted },
-  story: { marginTop: space[1] },
+  root: { flex: 1 },
+  feed: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: TAB_BAR_CLEARANCE },
   firstCard: { marginTop: space[6] },
   budget: { marginTop: space[6] },
 }));

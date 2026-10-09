@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -9,6 +9,7 @@ import {
   type Theme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SplashScreen } from './src/components/SplashScreen';
 import type { RootStackParamList } from './src/navigation/types';
 import { AddTransactionScreen } from './src/screens/AddTransactionScreen';
 import { BiometricScreen } from './src/screens/BiometricScreen';
@@ -141,6 +142,8 @@ function AppRoot() {
     },
   };
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
+  const [splashDone, setSplashDone] = useState(false);
+  const hideSplash = useCallback(() => setSplashDone(true), []);
   useAuthStateNavigation();
   useRelock();
 
@@ -185,6 +188,8 @@ function AppRoot() {
       ) : (
         <View style={[styles.splash, { backgroundColor: c.bg }]} />
       )}
+      {/* Over the first screen until it's ready, then fades to reveal it. */}
+      {splashDone ? null : <SplashScreen ready={initialRoute != null} onDone={hideSplash} />}
     </SafeAreaProvider>
   );
 }

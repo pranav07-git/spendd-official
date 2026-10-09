@@ -4,7 +4,8 @@ import { errorCodes, isErrorWithCode, pick, types } from '@react-native-document
 import { OutlineButton, PrimaryButton, TextButton } from '../../components/Buttons';
 import { PayeeAvatar } from '../../components/PayeeAvatar';
 import { Chips } from '../../components/Chips';
-import { ChevronLeftIcon, FilterIcon, SearchIcon } from '../../components/Icons';
+import { Header, HeaderButton } from '../../components/Header';
+import { FilterIcon, SearchIcon } from '../../components/Icons';
 import { StoryHeader } from '../../components/Layout';
 import { lifetimeStats } from '../../insights/engine';
 import {
@@ -19,7 +20,7 @@ import {
 } from '../../transactions/format';
 import { importScreenshot } from '../../transactions/store';
 import type { Transaction } from '../../transactions/types';
-import { makeStyles, radius, SCREEN_PADDING, space, TOUCH_TARGET, type, useTheme } from '../../theme';
+import { makeStyles, radius, SCREEN_PADDING, space, type, useTheme } from '../../theme';
 import { TAB_BAR_CLEARANCE } from './TabBar';
 
 type Filter = 'all' | 'debit' | 'credit';
@@ -132,30 +133,19 @@ export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd,
 
   return (
     <View style={s.root}>
-      <View style={s.header}>
-        {onBack ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={onBack}
-            style={({ pressed }) => [s.iconButton, pressed && s.pressed]}>
-            <ChevronLeftIcon size={24} color={c.ink} strokeWidth={2} />
-          </Pressable>
-        ) : (
-          <View style={s.iconButton} />
-        )}
-        <Text style={s.title} accessibilityRole="header">
-          Transactions
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={filter === 'all' ? 'Filter transactions' : `Filter transactions, showing ${FILTERS.find(f => f.key === filter)!.label.toLowerCase()}`}
-          accessibilityState={{ expanded: showFilters }}
-          onPress={() => setShowFilters(open => !open)}
-          style={({ pressed }) => [s.iconButton, filter !== 'all' && s.iconButtonActive, pressed && s.pressed]}>
-          <FilterIcon size={22} color={c.ink} strokeWidth={1.8} />
-        </Pressable>
-      </View>
+      <Header
+        title="Transactions"
+        onBack={onBack}
+        right={
+          <HeaderButton
+            label={filter === 'all' ? 'Filter transactions' : `Filter transactions, showing ${FILTERS.find(f => f.key === filter)!.label.toLowerCase()}`}
+            expanded={showFilters}
+            active={filter !== 'all'}
+            onPress={() => setShowFilters(open => !open)}>
+            <FilterIcon size={22} color={c.ink} strokeWidth={1.8} />
+          </HeaderButton>
+        }
+      />
 
       <SectionList
         sections={sections}
@@ -284,23 +274,6 @@ export function TransactionsTab({ transactions, onReload, onBack, onOpen, onAdd,
 
 const useStyles = makeStyles(c => ({
   root: { flex: 1, backgroundColor: c.bg },
-  header: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SCREEN_PADDING - 10,
-  },
-  iconButton: {
-    width: TOUCH_TARGET,
-    height: TOUCH_TARGET,
-    borderRadius: radius.s,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconButtonActive: { backgroundColor: c.surfaceSunken },
-  pressed: { opacity: 0.7 },
-  title: { ...type.title, color: c.ink },
   list: { paddingHorizontal: SCREEN_PADDING, paddingTop: space[4], paddingBottom: TAB_BAR_CLEARANCE },
   story: { marginBottom: space[6] },
   search: {

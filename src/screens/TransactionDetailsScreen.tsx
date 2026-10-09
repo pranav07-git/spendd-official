@@ -86,6 +86,8 @@ function EditCard({ tx, onSaved }: { tx: Transaction; onSaved: (tx: Transaction)
       });
       if (updated) {
         onSaved(updated);
+      } else {
+        setError('This transaction is no longer on your phone.');
       }
     } catch {
       setError('Couldn’t save your changes. Try again.');
@@ -117,7 +119,7 @@ function EditCard({ tx, onSaved }: { tx: Transaction; onSaved: (tx: Transaction)
           placeholderTextColor={c.inkSubtle}
           style={s.input}
           autoCapitalize="words"
-          accessibilityLabel="Paid to"
+          accessibilityLabel={direction === 'credit' ? 'Received from' : 'Paid to'}
         />
       </View>
       <DirectionToggle value={direction} onChange={setDirection} />
@@ -180,8 +182,12 @@ export function TransactionDetailsScreen({ navigation, route }: ScreenProps<'Tra
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await removeTransaction(tx.id);
-            navigation.goBack();
+            try {
+              await removeTransaction(tx.id);
+              navigation.goBack();
+            } catch {
+              Alert.alert('Couldn’t delete this', 'Something went wrong on this phone. Try again.');
+            }
           },
         },
       ],
@@ -281,7 +287,11 @@ export function TransactionDetailsScreen({ navigation, route }: ScreenProps<'Tra
         {tx.rawText ? <ScannedText text={tx.rawText} /> : null}
 
         <View style={s.actions}>
-          {editing ? null : <TextButton label="Edit" onPress={() => setEditing(true)} />}
+          {editing ? (
+            <TextButton label="Cancel edit" onPress={() => setEditing(false)} />
+          ) : (
+            <TextButton label="Edit" onPress={() => setEditing(true)} />
+          )}
           <TextButton label="Delete" color={c.low} onPress={confirmDelete} />
         </View>
       </ScrollView>

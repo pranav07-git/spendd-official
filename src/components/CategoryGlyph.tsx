@@ -1,45 +1,45 @@
-import type { ComponentType } from 'react';
 import {
-  Banknote,
+  ArrowUUpLeft,
+  Basket,
   Briefcase,
   Car,
-  CircleQuestionMark,
-  Clapperboard,
-  Ellipsis,
+  DotsThree,
+  FilmSlate,
+  ForkKnife,
   GraduationCap,
   House,
+  Money,
   Pill,
+  Plant,
+  Question,
   Receipt,
   ShoppingBag,
-  ShoppingBasket,
-  Sprout,
-  Undo2,
   User,
-  Utensils,
   Wallet,
-  type LucideProps,
-} from 'lucide-react-native';
+  type Icon,
+} from 'phosphor-react-native';
 import { useTheme } from '../theme';
+import { weightFor } from './Icons';
 
-/** One Lucide icon per category (and a few story card kinds). Unknown categories get "…". */
-const ICONS: Record<string, ComponentType<LucideProps>> = {
-  Food: Utensils,
-  Groceries: ShoppingBasket,
+/** One Phosphor icon per category (and a few story card kinds). Unknown categories get "…". */
+const ICONS: Record<string, Icon> = {
+  Food: ForkKnife,
+  Groceries: Basket,
   Medical: Pill,
   Travel: Car,
   Shopping: ShoppingBag,
   Bills: Receipt,
   Rent: House,
   Education: GraduationCap,
-  Entertainment: Clapperboard,
+  Entertainment: FilmSlate,
   Personal: User,
-  Other: Ellipsis,
+  Other: DotsThree,
   Salary: Briefcase,
-  Refund: Undo2,
-  Income: Banknote,
+  Refund: ArrowUUpLeft,
+  Income: Money,
   Total: Wallet,
-  Question: CircleQuestionMark,
-  Empty: Sprout,
+  Question: Question,
+  Empty: Plant,
 };
 
 export function CategoryGlyph({
@@ -54,6 +54,6 @@ export function CategoryGlyph({
   strokeWidth?: number;
 }) {
   const { c } = useTheme();
-  const Icon = ICONS[category] ?? Ellipsis;
-  return <Icon size={size} color={color ?? c.ink} strokeWidth={strokeWidth} />;
+  const Glyph = ICONS[category] ?? DotsThree;
+  return <Glyph size={size} color={color ?? c.ink} weight={weightFor(strokeWidth)} />;
 }

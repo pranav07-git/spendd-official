@@ -17,7 +17,8 @@ export function ConfirmPinScreen({ navigation, route }: ScreenProps<'ConfirmPin'
         } catch {
           return 'Couldn’t save your PIN. Try again.';
         }
-        navigation.navigate('Biometric');
+        // The PIN is saved: Back mustn't lead into creating it again.
+        navigation.reset({ index: 0, routes: [{ name: 'Biometric' }] });
         return null;
       }}
       // Forgot the PIN typed a moment ago: start over from the first step.
